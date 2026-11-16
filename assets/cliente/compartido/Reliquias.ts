@@ -118,15 +118,15 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "ROBAR_CARTA", valor: 2, objetivo: "PROPIO" }]
     },
-    reloj_par: {
-        id: "reloj_par",
-        nombre: "Reloj par",
-        descripcion: "Al inicio de cada turno PAR, gana 1 de Energía adicional.",
-        icono: "reliquia_reloj_par",
+    girasol: {
+        id: "girasol",
+        nombre: "Girasol",
+        descripcion: "Cada 3 turnos, gana 1 de Energía adicional.",
+        icono: "reliquia_girasol",
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
-        condicion: (ctx) => ctx.turnoNumero % 2 === 0,
+        condicion: (ctx) => ctx.turnoNumero % 3 === 0,
         efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
     },
     dinamita: {
@@ -172,7 +172,38 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         trigger: "AL_RECIBIR_DANIO",
         condicion: (ctx) => (ctx.danioRecibido || 0) > 0,
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "PROPIO", estadoId: "FUERZA" }]
-    }
+    },
+    sanacion: {
+        id: "sanacion",
+        nombre: "Sanacion",
+        descripcion: "Al iniciar un combate, cura 2 de HP.",
+        icono: "reliquia_sanacion",
+        clase: "neutral",
+        enPoolRecompensa: true,
+        trigger: "AL_INICIAR_COMBATE",
+        efectos: [{ tipo: "CURAR_HP", valor: 2, objetivo: "PROPIO" }]
+    },
+    elixir: {
+        id: "elixir",
+        nombre: "Elixir",
+        descripcion: "Al iniciar un combate, gana 1 de energia.",
+        icono: "reliquia_elixir",
+        clase: "neutral",
+        enPoolRecompensa: true,
+        trigger: "AL_INICIAR_COMBATE",
+        efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
+    },
+    reloj_par: {
+        id: "reloj_par",
+        nombre: "Reloj par",
+        descripcion: "Al inicio de cada turno PAR, gana 4 de bloqueo.",
+        icono: "reliquia_reloj_par",
+        clase: "neutral",
+        enPoolRecompensa: true,
+        trigger: "AL_INICIAR_TURNO",
+        condicion: (ctx) => ctx.turnoNumero % 2 === 0,
+        efectos: [{ tipo: "BLOQUEO", valor: 4, objetivo: "PROPIO" }]
+    },
 };
 
 /**

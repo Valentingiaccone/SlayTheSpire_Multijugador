@@ -47,6 +47,7 @@ const EFECTO_HANDLERS: Record<TipoEfecto, EfectoHandler> = {
 function resolverObjetivos(state: SpireState, lanzador: PlayerState, tipo: string, objetivoId?: string): EntidadCombate[] {
     switch (tipo) {
         case "PROPIO":
+            let x = 1
             return [lanzador];
         case "ENEMIGO": {
             const enemigo = state.enemigos.find((e) => e.uid === objetivoId && e.hp > 0);
