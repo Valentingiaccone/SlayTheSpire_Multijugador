@@ -241,7 +241,6 @@ export class CombatEngine {
         if (state.faseActual !== "COMBAT") return;
         const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
         if (!quedaEnemigoVivo) {
-            // Disparar reliquias de fin de combate (ej. Bandita de Shelly)
             RelicEngine.dispararParaTodos("AL_FINALIZAR_COMBATE", state);
 
             state.faseActual = state.pisoActual >= CONFIG_MAPA.CANTIDAD_PISOS ? "VICTORY" : "REWARD";

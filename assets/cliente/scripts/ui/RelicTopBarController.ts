@@ -45,6 +45,8 @@ export class RelicTopBarController extends Component {
             uiTrans.setContentSize(48, 48);
             const sp = iconoNode.addComponent(Sprite);
             sp.sizeMode = Sprite.SizeMode.CUSTOM;
+            SpriteManager.aplicarSprite(sp, "iconos", "icono_shelly")
+            console.log("entra bien")
             iconoNode.addComponent(Button);
             this.contenedorIconos.addChild(iconoNode);
             this.nodosIconos.push(iconoNode);

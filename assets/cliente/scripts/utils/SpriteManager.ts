@@ -1,6 +1,6 @@
 import { resources, SpriteFrame, Sprite } from "cc";
 
-export type TipoCarpeta = "iconos" | "cartas"
+export type TipoCarpeta = "iconos" | "cartas" | "reliquias"
 
 export class SpriteManager {
     // Caché en memoria: clave "carpeta/nombre" -> SpriteFrame

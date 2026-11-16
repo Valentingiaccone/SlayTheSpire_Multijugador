@@ -44,7 +44,7 @@ export const CARTAS_COMBATE: ICartaData[] = [
         ]
     },
     {
-        id: "muro_equipo",
+        id: "formacion_defensiva",
         nombre: "Formacion Defensiva",
         costo: 1,
         descripcion: "Todos los aliados ganan 6 de bloqueo.",
@@ -82,6 +82,21 @@ export const CARTAS_COMBATE: ICartaData[] = [
         tipo: "ATAQUE",
         efectos: [
             { tipo: "DANIO", valor: 8, objetivo: "TODOS_ENEMIGOS" }
+        ]
+    },
+    {
+        id: "onda_de_hierro",
+        nombre: "Onda de hierro",
+        costo: 1,
+        descripcion: "Inflige 5 de daño a un enemigo. Gana 5 de bloqueo.",
+        clase: "combate",
+        sprite: "onda_de_hierro",
+        enPoolRecompensa: true,
+        objetivoSeleccion: "ENEMIGO",
+        tipo: "ATAQUE",
+        efectos: [
+            { tipo: "DANIO", valor: 5, objetivo: "ENEMIGO" },
+            { tipo: "BLOQUEO", valor: 5, objetivo: "PROPIO" }
         ]
     },
 ]
