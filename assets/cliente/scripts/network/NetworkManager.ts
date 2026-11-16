@@ -25,7 +25,8 @@ export class NetworkManager extends Component {
     public async conectarYSala(nombreJugador: string) {
         try {
             const Colyseus = (window as any).Colyseus;
-            this.client = new Colyseus.Client("ws://localhost:2567");
+           // this.client = new Colyseus.Client("ws://localhost:2567");
+            this.client = new Colyseus.Client("https://slaythespire-multijugador.onrender.com")
             this.room = await this.client!.joinOrCreate("spire_room", { nombre: nombreJugador });
             console.log("Conectado a la sala:", this.room!.roomId, "Mi ID:", this.room!.sessionId);
 
