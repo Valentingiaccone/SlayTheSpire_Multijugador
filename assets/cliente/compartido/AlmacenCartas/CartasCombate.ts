@@ -35,7 +35,7 @@ export const CARTAS_COMBATE: ICartaData[] = [
         descripcion: "Inflige 8 de daño y aplica 2 de Vulnerable.",
         objetivoSeleccion: "ENEMIGO",
         clase: "combate",
-        sprite: "defender_combate",
+        sprite: "bash",
         enPoolRecompensa: false,
         tipo: "ATAQUE",
         efectos: [

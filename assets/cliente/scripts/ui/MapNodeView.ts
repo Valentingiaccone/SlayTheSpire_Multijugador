@@ -87,8 +87,7 @@ export class MapNodeView extends Component {
             const infoPj = PERSONAJES_INFO[pjId];
             const spriteComp = nodoIcono.getComponent(Sprite);
             if (infoPj && infoPj.icono && spriteComp) {
-                // Ajustá "personajes" al nombre de tu subcarpeta en resources/ si usás otra
-                SpriteManager.aplicarSprite(spriteComp, "personajes", infoPj.icono);
+                SpriteManager.aplicarSprite(spriteComp, "iconos", infoPj.icono);
             }
         });
     }

@@ -1,14 +1,17 @@
-import { _decorator, Component, Label, EventTouch, Vec3, UITransform, Node } from "cc";
+import { _decorator, Component, Label, EventTouch, Vec3, UITransform, Node, Sprite } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
+import { SpriteManager } from "../utils/SpriteManager";
 
 const { ccclass, property } = _decorator;
 
 @ccclass("CardView")
 export class CardView extends Component {
+
     @property(Label) labelCosto: Label = null;
     @property(Label) labelNombre: Label = null;
     @property(Label) labelDescripcion: Label = null;
     @property(Label) labelTipo: Label = null;
+    @property(Sprite) imagen: Sprite = null;
 
     private indiceMano: number = -1;
     private cartaData: ICartaData | null = null;
@@ -43,7 +46,9 @@ export class CardView extends Component {
         if (this.labelDescripcion) this.labelDescripcion.string = data.descripcion;
         if (this.labelTipo) this.labelTipo.string = data.tipo;
 
-        this.node.setScale(puedePagarse ? 1 : 0.92, puedePagarse ? 1 : 0.92, 1);
+        this.node.setScale(puedePagarse ? 1 : 0.92, puedePagarse ? 1 : 0.92, 1)
+
+        SpriteManager.aplicarSprite(this.imagen, "cartas", data.sprite)
     }
 
     private onTouchStart() {

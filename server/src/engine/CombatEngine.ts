@@ -188,15 +188,6 @@ export class CombatEngine {
         });
     }
 
-    private static verificarVictoriaCombate(state: SpireState) {
-        const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
-        if (!quedaEnemigoVivo) {
-            // En el Paso 5 acá pasamos a "REWARD" (o "VICTORY" si pisoActual === 3)
-            state.faseActual = state.pisoActual >= 3 ? "VICTORY" : "REWARD";
-            console.log(`¡Combate ganado! Nueva fase: ${state.faseActual}`);
-        }
-    }
-
     private static actualizarContadoresMazo(jugador: PlayerState) {
         jugador.cantPilaRobo = jugador.pilaRoboInterna.length;
         jugador.cantDescarte = jugador.descarteInterno.length;

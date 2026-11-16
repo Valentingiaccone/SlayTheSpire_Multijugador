@@ -11,7 +11,7 @@ export interface INodoMapaData {
 }
 
 export const CONFIG_MAPA = {
-    CANTIDAD_PISOS: 5,            // Cambiá este valor para alargar o acortar todos los caminos (último piso = Jefe)
+    CANTIDAD_PISOS: 8,            // Cambiá este valor para alargar o acortar todos los caminos (último piso = Jefe)
     COLUMNAS: 5,                  // Ancho de la grilla (0 a 4)
     MIN_HOJAS_INICIO: 3,          // Mínimo de nodos iniciales en el Piso 1
     MAX_HOJAS_INICIO: 4,          // Máximo de nodos iniciales en el Piso 1
@@ -65,7 +65,7 @@ export function generarMapaRun(): INodoMapaData[] {
             }
 
             // Elegimos 1 o 2 conexiones hacia arriba
-            const quiereDos = candidatas.length > 1 && (Math.random() < 0.45 || (nodosActuales.length < 3 && idx === 0));
+            const quiereDos = candidatas.length > 1 && (Math.random() < 0.20 || (nodosActuales.length < 3 && idx === 0));
             const cantConexiones = quiereDos ? 2 : 1;
 
             mezclarArray(candidatas);

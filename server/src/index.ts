@@ -19,7 +19,11 @@ const gameServer = new Server({
 
 gameServer.define("spire_room", SpireRoom);
 
-const PORT = 2567;
+const PORT = Number(process.env.PORT) || 2567;
+gameServer.listen(PORT).then(() => {
+    console.log(`Servidor Colyseus escuchando en el puerto ${PORT}`);
+});
+
 gameServer.listen(PORT).then(() => {
     console.log(`Servidor Colyseus escuchando en ws://localhost:${PORT}`);
 });

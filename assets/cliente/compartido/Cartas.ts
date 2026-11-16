@@ -38,7 +38,6 @@ for (const carta of TODAS_LAS_CARTAS) {
     if (CATALOGO_CARTAS[carta.id]) {
         console.error(`[Cartas] ¡ID duplicado detectado!: "${carta.id}"`);
     }
-    console.log("bien")
     CATALOGO_CARTAS[carta.id] = carta;
 }
 
