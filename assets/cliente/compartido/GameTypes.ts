@@ -42,7 +42,7 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
             "defender_combate", "defender_combate", "defender_combate", "defender_combate",
             "bash"
         ],
-        reliquiaInicial: "lluvia_espinas"
+        reliquiaInicial: "bandita"
     },
     CROW: {
         id: "CROW",

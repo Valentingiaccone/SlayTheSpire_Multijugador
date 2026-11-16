@@ -7,7 +7,7 @@ export type TriggerReliquia =
     | "AL_JUGAR_CARTA"
     | "AL_TERMINAR_TURNO"
     | "AL_RECIBIR_DANIO"
-    | "AL_FINALIZAR_COMBATE";
+    | "AL_FINALIZAR_COMBATE"
 
 /**
  * Contexto rico que reciben TODAS las reliquias aunque no usen todos los parámetros.
@@ -71,7 +71,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         id: "distintivo_abogado",
         nombre: "Distintivo de Abogado",
         descripcion: "Al inicio de cada combate, gana 10 de bloqueo.",
-        icono: "reliquia_distintivo",
+        icono: "reliquia_distintivo_abogado",
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_COMBATE",
@@ -87,11 +87,11 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 3, objetivo: "PROPIO", estadoId: "ESPINAS" }]
     },
-    sobrecarga: {
-        id: "sobrecarga",
-        nombre: "Sobrecarga",
+    mancuernas: {
+        id: "mancuernas",
+        nombre: "Mancuernas",
         descripcion: "Si terminás tu turno sin haber jugado ataques, ganás +2 de Fuerza por el resto del combate.",
-        icono: "reliquia_sobrecarga",
+        icono: "reliquia_mancuernas",
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_TERMINAR_TURNO",
@@ -118,51 +118,49 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "ROBAR_CARTA", valor: 2, objetivo: "PROPIO" }]
     },
-
-    // ================= MÁS RELIQUIAS ESCALABLES =================
-    engranaje_par: {
-        id: "engranaje_par",
-        nombre: "Engranaje Par",
-        descripcion: "Al inicio de cada turno PAR (2, 4, 6...), gana 1 de Energía adicional.",
-        icono: "reliquia_engranaje_par",
+    reloj_par: {
+        id: "reloj_par",
+        nombre: "Reloj par",
+        descripcion: "Al inicio de cada turno PAR, gana 1 de Energía adicional.",
+        icono: "reliquia_reloj_par",
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
         condicion: (ctx) => ctx.turnoNumero % 2 === 0,
         efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
     },
-    daga_ritmica: {
-        id: "daga_ritmica",
-        nombre: "Daga Rítmica",
+    dinamita: {
+        id: "dinamita",
+        nombre: "Dinamita",
         descripcion: "Cada 3 cartas que juegues en un mismo turno, inflige 5 de daño a todos los enemigos.",
-        icono: "reliquia_daga_ritmica",
+        icono: "reliquia_dinamita",
         clase: "asesino",
         enPoolRecompensa: true,
         trigger: "AL_JUGAR_CARTA",
         condicion: (ctx) => ctx.cartasJugadasTurno > 0 && ctx.cartasJugadasTurno % 3 === 0,
         efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS" }]
     },
-    estandarte_escuadron: {
-        id: "estandarte_escuadron",
-        nombre: "Estandarte de Escuadrón",
+    spooky: {
+        id: "spooky",
+        nombre: "Spooky",
         descripcion: "En el turno 2 de cada combate, otorga 8 de bloqueo a TODOS los aliados.",
-        icono: "reliquia_estandarte_escuadron",
-        clase: "combate",
+        icono: "reliquia_spooky",
+        clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
         condicion: (ctx) => ctx.turnoNumero === 2,
         efectos: [{ tipo: "BLOQUEO", valor: 8, objetivo: "TODOS_ALIADOS" }]
     },
-    nucleo_septimo: {
-        id: "nucleo_septimo",
-        nombre: "Núcleo Séptimo",
-        descripcion: "En el turno 7, inflige 25 de daño a todos los enemigos.",
-        icono: "reliquia_nucleo_septimo",
+    oso_en_punto: {
+        id: "oso_en_punto",
+        nombre: "Las oso en punto",
+        descripcion: "En el turno 8, inflige 50 de daño a todos los enemigos.",
+        icono: "reliquia_oso_en_punto",
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
-        condicion: (ctx) => ctx.turnoNumero === 7,
-        efectos: [{ tipo: "DANIO", valor: 25, objetivo: "TODOS_ENEMIGOS" }]
+        condicion: (ctx) => ctx.turnoNumero === 8,
+        efectos: [{ tipo: "DANIO", valor: 50, objetivo: "TODOS_ENEMIGOS" }]
     },
     sangre_vengativa: {
         id: "sangre_vengativa",
