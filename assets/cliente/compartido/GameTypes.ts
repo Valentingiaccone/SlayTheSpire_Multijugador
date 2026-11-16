@@ -1,13 +1,14 @@
+export type FaseSala = "LOBBY" | "MAP" | "COMBAT" | "REWARD" | "VICTORY" | "DEFEAT";
+
 export const MENSAJES = {
     ELEGIR_PERSONAJE: "elegir_personaje",
     TOGGLE_LISTO: "toggle_listo",
+    VOTAR_NODO: "votar_nodo",
     JUGAR_CARTA: "jugar_carta",
     TERMINAR_TURNO: "terminar_turno",
     ELEGIR_RECOMPENSA: "elegir_recompensa",
     REINICIAR_PARTIDA: "reiniciar_partida"
-} as const
-
-export type FaseSala = "LOBBY" | "COMBAT" | "REWARD" | "VICTORY" | "DEFEAT"
+} as const;
 
 export type PersonajeId = "SHELLY" | "CROW"
 

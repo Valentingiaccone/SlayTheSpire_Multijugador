@@ -60,4 +60,8 @@ export class NetworkManager extends Component {
     public reiniciarPartida() {
         this.room?.send(MENSAJES.REINICIAR_PARTIDA);
     }
+
+    public votarNodoMapa(nodoId: string) {
+        this.room?.send(MENSAJES.VOTAR_NODO, { nodoId });
+    }
 }

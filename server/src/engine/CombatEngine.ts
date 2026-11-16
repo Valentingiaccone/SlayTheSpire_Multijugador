@@ -1,6 +1,7 @@
 import { SpireState, PlayerState, EnemyState } from "../rooms/schema/SpireState";
 import { CATALOGO_CARTAS, IEfecto, TipoEfecto, EstadoId } from "../../../assets/cliente/compartido/Cartas";
 import { ENEMIGOS_INFO } from "../../../assets/cliente/compartido/Enemigos";
+import { CONFIG_MAPA } from "../../../assets/cliente/compartido/Mapa";
 
 type EntidadCombate = PlayerState | EnemyState;
 type EfectoHandler = (state: SpireState, lanzador: PlayerState, efecto: IEfecto, objetivoId?: string) => void;
@@ -205,6 +206,14 @@ export class CombatEngine {
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+
+    private static verificarVictoriaCombate(state: SpireState) {
+        const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
+        if (!quedaEnemigoVivo) {
+            state.faseActual = state.pisoActual >= CONFIG_MAPA.CANTIDAD_PISOS ? "VICTORY" : "REWARD";
+            console.log(`¡Combate ganado! Nueva fase: ${state.faseActual}`);
         }
     }
 }

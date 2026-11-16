@@ -12,6 +12,12 @@ export interface IEnemigoInfo {
     patron: IIntencionPatron[];
 }
 
+export interface IEncuentroPool {
+    id: string;
+    pisoMinimo: number;
+    enemigos: string[];
+}
+
 export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
     slime_acido: {
         id: "slime_acido",
@@ -45,9 +51,24 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
     }
 };
 
-// Los 3 combates lineales de nuestra demo
-export const ENCUENTROS_POR_PISO: Record<number, string[]> = {
-    1: ["slime_acido", "slime_acido"],
-    2: ["cultista", "slime_acido"],
-    3: ["guardian_antiguo"]
-};
+// Pool escalable de combates normales
+export const POOL_ENCUENTROS_NORMALES: IEncuentroPool[] = [
+    { id: "slimes_dobles", pisoMinimo: 1, enemigos: ["slime_acido", "slime_acido"] },
+    { id: "cultista_solitario", pisoMinimo: 1, enemigos: ["cultista"] },
+    { id: "cultista_y_slime", pisoMinimo: 2, enemigos: ["cultista", "slime_acido"] },
+    { id: "doble_cultista", pisoMinimo: 3, enemigos: ["cultista", "cultista"] }
+];
+
+// Pool escalable de Jefes
+export const POOL_ENCUENTROS_JEFES: IEncuentroPool[] = [
+    { id: "jefe_guardian", pisoMinimo: 1, enemigos: ["guardian_antiguo"] }
+];
+
+export function obtenerEncuentroAleatorio(esJefe: boolean, pisoActual: number): string[] {
+    const poolBase = esJefe ? POOL_ENCUENTROS_JEFES : POOL_ENCUENTROS_NORMALES;
+    const candidatos = poolBase.filter((e) => pisoActual >= e.pisoMinimo);
+    const listaFinal = candidatos.length > 0 ? candidatos : poolBase;
+
+    const elegido = listaFinal[Math.floor(Math.random() * listaFinal.length)];
+    return [...elegido.enemigos];
+}
