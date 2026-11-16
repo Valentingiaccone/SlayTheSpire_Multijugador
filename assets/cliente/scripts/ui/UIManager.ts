@@ -12,6 +12,8 @@ export class UIManager extends Component {
     @property(Node) panelRecompensa: Node = null!;
     @property(Node) panelFinPartida: Node = null!;
     @property(Label) labelFinPartida: Label = null!;
+    @property(Node) panelCofre: Node = null!;
+    @property(Node) barraSuperiorReliquias: Node = null!;
 
     // Botón flotante arriba a la derecha para abrir/cerrar el mapa en cualquier momento
     @property(Node) btnToggleMapa: Node = null!;
@@ -50,9 +52,12 @@ export class UIManager extends Component {
             this.panelMapa.active = (fase === "MAP") || this.mapaAbiertoEnConsulta;
         }
 
-        // El botón para consultar el mapa está disponible durante COMBAT y REWARD
+        if (this.panelCofre) this.panelCofre.active = (fase === "CHEST");
+        if (this.barraSuperiorReliquias) {
+            this.barraSuperiorReliquias.active = (fase !== "LOBBY");
+        }
         if (this.btnToggleMapa) {
-            this.btnToggleMapa.active = (fase === "COMBAT" || fase === "REWARD");
+            this.btnToggleMapa.active = (fase === "COMBAT" || fase === "REWARD" || fase === "CHEST");
         }
 
         const esFin = fase === "VICTORY" || fase === "DEFEAT";

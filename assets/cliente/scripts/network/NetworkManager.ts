@@ -54,8 +54,16 @@ export class NetworkManager extends Component {
         this.room?.send(MENSAJES.JUGAR_CARTA, { indiceMano, objetivoId });
     }
 
-    public elegirRecompensa(cartaId: string | null) {
-        this.room?.send(MENSAJES.ELEGIR_RECOMPENSA, { cartaId });
+    public elegirRecompensa(cartaId: string | null, tomarReliquia: boolean = false) {
+        this.room?.send(MENSAJES.ELEGIR_RECOMPENSA, { cartaId, tomarReliquia });
+    }
+
+    public abrirCofre() {
+        this.room?.send(MENSAJES.ABRIR_COFRE);
+    }
+
+    public votarReliquiaCofre(reliquiaId: string) {
+        this.room?.send(MENSAJES.VOTAR_RELIQUIA_COFRE, { reliquiaId });
     }
 
     public reiniciarPartida() {

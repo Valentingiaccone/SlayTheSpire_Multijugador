@@ -1,25 +1,40 @@
-export type TipoNodoMapa = "COMBATE" | "JEFE" | "EVENTO" | "ELITE" | "HOGUERA" | "TIENDA";
+export type TipoNodoMapa = "COMBATE" | "ELITE" | "COFRE" | "JEFE" | "EVENTO" | "HOGUERA" | "TIENDA";
 export type EstadoNodoMapa = "BLOQUEADO" | "DISPONIBLE" | "ACTUAL" | "COMPLETADO";
 
 export interface INodoMapaData {
     id: string;
-    piso: number;        // 1 = abajo del todo, CANTIDAD_PISOS = Jefe arriba del todo
-    columna: number;     // 0 a COLUMNAS - 1
+    piso: number;
+    columna: number;
     tipo: TipoNodoMapa;
     estado: EstadoNodoMapa;
     siguientesIds: string[];
 }
 
+export interface IReglaAparicionNodo {
+    min: number;          // Cantidad mínima garantizada en el mapa
+    max: number;          // Cantidad máxima permitida en el mapa
+    probabilidad: number; // Porcentaje (0 a 100) de que un nodo intermedio intente ser de este tipo
+}
+
 export const CONFIG_MAPA = {
-    CANTIDAD_PISOS: 8,            // Cambiá este valor para alargar o acortar todos los caminos (último piso = Jefe)
-    COLUMNAS: 5,                  // Ancho de la grilla (0 a 4)
-    MIN_HOJAS_INICIO: 3,          // Mínimo de nodos iniciales en el Piso 1
-    MAX_HOJAS_INICIO: 4,          // Máximo de nodos iniciales en el Piso 1
-    SEGUNDOS_CUENTA_REGRESIVA: 3  // Segundos antes de viajar una vez que hay mayoría
+    CANTIDAD_PISOS: 7,            // Podés cambiarlo libremente
+    COLUMNAS: 5,
+    MIN_HOJAS_INICIO: 3,
+    MAX_HOJAS_INICIO: 4,
+    SEGUNDOS_CUENTA_REGRESIVA: 3
+};
+
+/**
+ * Configuración escalable de eventos del mapa (aplicada entre el Piso 2 y CANTIDAD_PISOS - 1).
+ * Si mañana agregás HOGUERA o TIENDA, solo sumás una línea acá.
+ */
+export const REGLAS_NODOS_MAPA: Partial<Record<TipoNodoMapa, IReglaAparicionNodo>> = {
+    ELITE: { min: 2, max: 5, probabilidad: 22 },
+    COFRE: { min: 1, max: 3, probabilidad: 15 }
 };
 
 export function generarMapaRun(): INodoMapaData[] {
-    const totalPisos = Math.max(2, CONFIG_MAPA.CANTIDAD_PISOS);
+    const totalPisos = Math.max(3, CONFIG_MAPA.CANTIDAD_PISOS);
     const totalCols = CONFIG_MAPA.COLUMNAS;
     const mapaPorPiso: Map<number, Map<number, INodoMapaData>> = new Map();
 
@@ -27,7 +42,7 @@ export function generarMapaRun(): INodoMapaData[] {
         mapaPorPiso.set(p, new Map());
     }
 
-    // 1. Piso 1: Crear entre MIN_HOJAS_INICIO (3) y MAX_HOJAS_INICIO (4) nodos iniciales
+    // 1. Piso 1: Hojas iniciales (siempre COMBATE)
     const colsDisponibles = Array.from({ length: totalCols }, (_, i) => i);
     mezclarArray(colsDisponibles);
     const cantHojas = Math.min(
@@ -42,17 +57,15 @@ export function generarMapaRun(): INodoMapaData[] {
             piso: 1,
             columna: col,
             tipo: "COMBATE",
-            estado: "DISPONIBLE", // En el piso 1 arrancan disponibles para votar
+            estado: "DISPONIBLE",
             siguientesIds: []
         });
     }
 
-    // 2. Pisos intermedios (1 hasta totalPisos - 2 -> conectan con p + 1)
+    // 2. Pisos intermedios (creamos la estructura inicialmente como COMBATE)
     for (let p = 1; p <= totalPisos - 2; p++) {
         const nodosActuales = Array.from(mapaPorPiso.get(p)!.values()).sort((a, b) => a.columna - b.columna);
         const pisoSiguiente = mapaPorPiso.get(p + 1)!;
-
-        // Evita cruces en X: ningún nodo puede conectarse a una columna menor que el máximo destino del nodo a su izquierda
         let maxColUsadaPorIzquierda = 0;
 
         nodosActuales.forEach((nodo, idx) => {
@@ -60,12 +73,9 @@ export function generarMapaRun(): INodoMapaData[] {
             const maxCol = Math.min(totalCols - 1, Math.max(minCol, nodo.columna + 1));
 
             const candidatas: number[] = [];
-            for (let c = minCol; c <= maxCol; c++) {
-                candidatas.push(c);
-            }
+            for (let c = minCol; c <= maxCol; c++) candidatas.push(c);
 
-            // Elegimos 1 o 2 conexiones hacia arriba
-            const quiereDos = candidatas.length > 1 && (Math.random() < 0.20 || (nodosActuales.length < 3 && idx === 0));
+            const quiereDos = candidatas.length > 1 && (Math.random() < 0.45 || (nodosActuales.length < 3 && idx === 0));
             const cantConexiones = quiereDos ? 2 : 1;
 
             mezclarArray(candidatas);
@@ -77,7 +87,7 @@ export function generarMapaRun(): INodoMapaData[] {
                         id: `p${p + 1}_c${colDestino}`,
                         piso: p + 1,
                         columna: colDestino,
-                        tipo: elegirTipoNodoIntermedio(p + 1, totalPisos),
+                        tipo: "COMBATE",
                         estado: "BLOQUEADO",
                         siguientesIds: []
                     });
@@ -87,12 +97,11 @@ export function generarMapaRun(): INodoMapaData[] {
                     nodo.siguientesIds.push(nodoDestino.id);
                 }
             }
-
             maxColUsadaPorIzquierda = Math.max(maxColUsadaPorIzquierda, ...elegidas);
         });
     }
 
-    // 3. Último Piso (Jefe único en el centro)
+    // 3. Último Piso: Único nodo JEFE
     const colJefe = Math.floor(totalCols / 2);
     const nodoJefe: INodoMapaData = {
         id: `p${totalPisos}_jefe`,
@@ -104,13 +113,14 @@ export function generarMapaRun(): INodoMapaData[] {
     };
     mapaPorPiso.get(totalPisos)!.set(colJefe, nodoJefe);
 
-    // Todos los nodos del anteúltimo piso convergen en el Jefe
     const nodosAnteultimo = Array.from(mapaPorPiso.get(totalPisos - 1)!.values());
     for (const nodo of nodosAnteultimo) {
         nodo.siguientesIds.push(nodoJefe.id);
     }
 
-    // Devolver lista plana ordenada por piso y columna
+    // 4. Distribuir ELITE, COFRE y futuros eventos en los pisos intermedios (2 hasta totalPisos - 1)
+    distribuirTiposNodosIntermedios(mapaPorPiso, totalPisos);
+
     const resultado: INodoMapaData[] = [];
     for (let p = 1; p <= totalPisos; p++) {
         const nodosPiso = Array.from(mapaPorPiso.get(p)!.values()).sort((a, b) => a.columna - b.columna);
@@ -119,10 +129,41 @@ export function generarMapaRun(): INodoMapaData[] {
     return resultado;
 }
 
-function elegirTipoNodoIntermedio(_piso: number, _totalPisos: number): TipoNodoMapa {
-    // Por ahora todos los nodos intermedios son COMBATE.
-    // Mañana acá podés retornar "EVENTO", "HOGUERA", "ELITE" o "TIENDA" según probabilidades.
-    return "COMBATE";
+function distribuirTiposNodosIntermedios(mapaPorPiso: Map<number, Map<number, INodoMapaData>>, totalPisos: number) {
+    const nodosIntermedios: INodoMapaData[] = [];
+    for (let p = 2; p <= totalPisos - 1; p++) {
+        nodosIntermedios.push(...Array.from(mapaPorPiso.get(p)!.values()));
+    }
+    mezclarArray(nodosIntermedios);
+
+    const conteoActual: Record<string, number> = {};
+    const entradasReglas = Object.entries(REGLAS_NODOS_MAPA) as [TipoNodoMapa, IReglaAparicionNodo][];
+    entradasReglas.forEach(([tipo]) => (conteoActual[tipo] = 0));
+
+    // Paso A: Garantizar el mínimo de cada regla
+    for (const [tipo, regla] of entradasReglas) {
+        for (const nodo of nodosIntermedios) {
+            if (conteoActual[tipo] >= regla.min) break;
+            if (nodo.tipo === "COMBATE") {
+                nodo.tipo = tipo;
+                conteoActual[tipo]++;
+            }
+        }
+    }
+
+    // Paso B: Tirar porcentajes en los nodos restantes sin superar el máximo
+    for (const nodo of nodosIntermedios) {
+        if (nodo.tipo !== "COMBATE") continue;
+
+        for (const [tipo, regla] of entradasReglas) {
+            if (conteoActual[tipo] >= regla.max) continue;
+            if (Math.random() * 100 < regla.probabilidad) {
+                nodo.tipo = tipo;
+                conteoActual[tipo]++;
+                break;
+            }
+        }
+    }
 }
 
 function mezclarArray<T>(arr: T[]) {

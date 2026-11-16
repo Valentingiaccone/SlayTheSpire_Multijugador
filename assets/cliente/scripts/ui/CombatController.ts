@@ -202,10 +202,12 @@ export class CombatController extends Component {
         const fuerza = leer("FUERZA");
         const vuln = leer("VULNERABLE");
         const debil = leer("DEBIL");
+        const espinas = leer("ESPINAS");
 
         if (fuerza !== 0) lista.push(`💪${fuerza > 0 ? "+" : ""}${fuerza}`);
         if (vuln > 0) lista.push(`💔Vuln(${vuln})`);
         if (debil > 0) lista.push(`📉Débil(${debil})`);
+        if (espinas > 0) lista.push(`🌵Espinas(${espinas})`);
 
         return lista.length > 0 ? ` [${lista.join(" ")}]` : "";
     }

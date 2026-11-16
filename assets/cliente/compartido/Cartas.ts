@@ -3,8 +3,8 @@ import { CARTAS_VENENO } from "./AlmacenCartas/CartasVeneno";
 import { ClaseId, PersonajeId, PERSONAJES_INFO } from "./GameTypes";
 
 export type TipoObjetivo = "ENEMIGO" | "TODOS_ENEMIGOS" | "ALIADO" | "TODOS_ALIADOS" | "PROPIO";
-export type TipoEfecto = "DANIO" | "BLOQUEO" | "APLICAR_ESTADO" | "ROBAR_CARTA" | "GANAR_ENERGIA";
-export type EstadoId = "FUERZA" | "VULNERABLE" | "DEBIL";
+export type TipoEfecto = "DANIO" | "BLOQUEO" | "APLICAR_ESTADO" | "ROBAR_CARTA" | "GANAR_ENERGIA" | "CURAR_HP";
+export type EstadoId = "FUERZA" | "VULNERABLE" | "DEBIL" | "ESPINAS" | "VENENO";
 export type TipoCartaId = "ATAQUE" | "HABILIDAD" | "PODER"
 
 export interface IEfecto {

@@ -1,4 +1,4 @@
-export type FaseSala = "LOBBY" | "MAP" | "COMBAT" | "REWARD" | "VICTORY" | "DEFEAT";
+export type FaseSala = "LOBBY" | "MAP" | "COMBAT" | "REWARD" | "CHEST" | "VICTORY" | "DEFEAT";
 
 export const MENSAJES = {
     ELEGIR_PERSONAJE: "elegir_personaje",
@@ -7,22 +7,25 @@ export const MENSAJES = {
     JUGAR_CARTA: "jugar_carta",
     TERMINAR_TURNO: "terminar_turno",
     ELEGIR_RECOMPENSA: "elegir_recompensa",
+    ABRIR_COFRE: "abrir_cofre",
+    VOTAR_RELIQUIA_COFRE: "votar_reliquia_cofre",
     REINICIAR_PARTIDA: "reiniciar_partida"
 } as const;
 
-export type PersonajeId = "SHELLY" | "CROW"
+export type PersonajeId = "SHELLY" | "CROW";
 
-export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow"
+export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow";
 
 export interface IPersonajeInfo {
-    id: PersonajeId
-    nombre: string
-    icono: string
-    hpMax: number
-    energiaMax: number
-    descripcion: string
-    clases: ClaseId[]
+    id: PersonajeId;
+    nombre: string;
+    icono: string;
+    hpMax: number;
+    energiaMax: number;
+    descripcion: string;
+    clases: ClaseId[];
     mazoInicial: string[];
+    reliquiaInicial: string;
 }
 
 export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
@@ -34,10 +37,12 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
         energiaMax: 3,
         descripcion: "Personaje simple, tiene buen ataque, defensa y forma de ganar dinero.",
         clases: ["combate", "ladron", "shelly"],
-        mazoInicial: ["golpe_combate", "golpe_combate", "golpe_combate", "golpe_combate",
+        mazoInicial: [
+            "golpe_combate", "golpe_combate", "golpe_combate", "golpe_combate",
             "defender_combate", "defender_combate", "defender_combate", "defender_combate",
             "bash"
-        ]
+        ],
+        reliquiaInicial: "bandita"
     },
     CROW: {
         id: "CROW",
@@ -47,9 +52,11 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
         energiaMax: 3,
         descripcion: "Envenena a sus enemigos y lanza muchos ataques para acabar con sus enemigos.",
         clases: ["veneno", "asesino", "crow"],
-        mazoInicial: ["golpe_veneno", "golpe_veneno", "golpe_veneno", "golpe_veneno",
+        mazoInicial: [
+            "golpe_veneno", "golpe_veneno", "golpe_veneno", "golpe_veneno",
             "defender_veneno", "defender_veneno", "defender_veneno", "defender_veneno",
             "bash"
-        ]
+        ],
+        reliquiaInicial: "cocoroch"
     }
 };

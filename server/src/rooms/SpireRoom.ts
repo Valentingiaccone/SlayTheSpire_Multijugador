@@ -3,12 +3,16 @@ import { SpireState, PlayerState, EnemyState, MapNodeState } from "./schema/Spir
 import { MENSAJES, PersonajeId, PERSONAJES_INFO } from "../../../assets/cliente/compartido/GameTypes";
 import { ENEMIGOS_INFO, obtenerEncuentroAleatorio } from "../../../assets/cliente/compartido/Enemigos";
 import { generarOpcionesRecompensa, obtenerMazoInicial } from "../../../assets/cliente/compartido/Cartas";
+import { obtenerReliquiasRecompensa } from "../../../assets/cliente/compartido/Reliquias";
 import { CONFIG_MAPA, generarMapaRun } from "../../../assets/cliente/compartido/Mapa";
 import { CombatEngine } from "../engine/CombatEngine";
+import { RelicEngine } from "../engine/RelicEngine";
 
 export class SpireRoom extends Room<SpireState> {
     maxClients = 4;
     private timerMapa: Delayed | null = null;
+    private timerCofre: Delayed | null = null;
+    private firmaVotosCofreActual: string = "";
 
     onCreate() {
         this.setState(new SpireState());
@@ -31,18 +35,15 @@ export class SpireRoom extends Room<SpireState> {
         this.state.jugadores.delete(client.sessionId);
         if (this.state.jugadores.size === 0) {
             this.cancelarCuentaRegresivaMapa();
+            this.cancelarCuentaRegresivaCofre();
             return;
         }
 
-        if (this.state.faseActual === "LOBBY") {
-            this.verificarInicioPartida();
-        } else if (this.state.faseActual === "MAP") {
-            this.evaluarVotosMapa();
-        } else if (this.state.faseActual === "COMBAT") {
-            this.verificarFinTurnoJugadores();
-        } else if (this.state.faseActual === "REWARD") {
-            this.verificarFinRecompensas();
-        }
+        if (this.state.faseActual === "LOBBY") this.verificarInicioPartida();
+        else if (this.state.faseActual === "MAP") this.evaluarVotosMapa();
+        else if (this.state.faseActual === "COMBAT") this.verificarFinTurnoJugadores();
+        else if (this.state.faseActual === "REWARD") this.verificarFinRecompensas();
+        else if (this.state.faseActual === "CHEST" && this.state.cofreAbierto) this.evaluarVotosCofre();
     }
 
     private registrarMensajes() {
@@ -82,6 +83,9 @@ export class SpireRoom extends Room<SpireState> {
             if (!jugador || jugador.hp <= 0 || jugador.turnoTerminado) return;
 
             jugador.turnoTerminado = true;
+            // Disparar reliquias AL_TERMINAR_TURNO (ej. Sobrecarga)
+            RelicEngine.dispararParaJugador("AL_TERMINAR_TURNO", this.state, jugador);
+
             CombatEngine.descartarMano(jugador);
             this.verificarFinTurnoJugadores();
         });
@@ -96,24 +100,60 @@ export class SpireRoom extends Room<SpireState> {
             }
         });
 
-        this.onMessage(MENSAJES.ELEGIR_RECOMPENSA, (client, data: { cartaId: string | null }) => {
-            if (this.state.faseActual !== "REWARD") return;
-            const jugador = this.state.jugadores.get(client.sessionId);
-            if (!jugador || jugador.recompensaElegida) return;
+        // Recibe la carta seleccionada (o null) y si seleccionó la reliquia de Élite al darle a Continuar
+        this.onMessage(
+            MENSAJES.ELEGIR_RECOMPENSA,
+            (client, data: { cartaId: string | null; tomarReliquia?: boolean }) => {
+                if (this.state.faseActual !== "REWARD") return;
+                const jugador = this.state.jugadores.get(client.sessionId);
+                if (!jugador || jugador.recompensaElegida) return;
 
-            if (data?.cartaId && jugador.opcionesRecompensa.includes(data.cartaId)) {
-                jugador.mazoMaestro.push(data.cartaId);
+                if (data?.cartaId && jugador.opcionesRecompensa.includes(data.cartaId)) {
+                    jugador.mazoMaestro.push(data.cartaId);
+                }
+
+                if (data?.tomarReliquia && jugador.reliquiaRecompensa) {
+                    jugador.reliquias.push(jugador.reliquiaRecompensa);
+                }
+
+                jugador.recompensaElegida = true;
+                jugador.opcionesRecompensa.clear();
+                jugador.reliquiaRecompensa = "";
+                this.verificarFinRecompensas();
             }
+        );
 
-            jugador.recompensaElegida = true;
-            jugador.opcionesRecompensa.clear();
-            this.verificarFinRecompensas();
+        // ================= EVENTO COFRE =================
+        this.onMessage(MENSAJES.ABRIR_COFRE, () => {
+            if (this.state.faseActual !== "CHEST" || this.state.cofreAbierto) return;
+
+            this.state.cofreAbierto = true;
+            this.state.reliquiasCofre.clear();
+
+            const cantJugadores = Math.max(1, this.state.jugadores.size);
+            const reliquiasGeneradas = obtenerReliquiasRecompensa(this.state.jugadores, cantJugadores);
+            reliquiasGeneradas.forEach((rId) => this.state.reliquiasCofre.push(rId));
+        });
+
+        this.onMessage(MENSAJES.VOTAR_RELIQUIA_COFRE, (client, data: { reliquiaId: string }) => {
+            if (this.state.faseActual !== "CHEST" || !this.state.cofreAbierto) return;
+            const jugador = this.state.jugadores.get(client.sessionId);
+            if (!jugador) return;
+
+            if (!this.state.reliquiasCofre.includes(data?.reliquiaId)) return;
+
+            // Si toca la misma que ya tenía votada, la deselecciona; si no, la selecciona
+            jugador.reliquiaCofreVotadaId =
+                jugador.reliquiaCofreVotadaId === data.reliquiaId ? "" : data.reliquiaId;
+
+            this.evaluarVotosCofre();
         });
 
         this.onMessage(MENSAJES.REINICIAR_PARTIDA, () => {
             if (this.state.faseActual !== "VICTORY" && this.state.faseActual !== "DEFEAT") return;
 
             this.cancelarCuentaRegresivaMapa();
+            this.cancelarCuentaRegresivaCofre();
             this.state.pisoActual = 1;
             this.state.turnoNumero = 1;
             this.state.nodoActualId = "";
@@ -122,6 +162,8 @@ export class SpireRoom extends Room<SpireState> {
             this.state.jugadores.forEach((j) => {
                 j.listo = false;
                 j.nodoVotadoId = "";
+                j.reliquiaCofreVotadaId = "";
+                j.reliquias.clear();
                 j.aplicarDatosPersonaje(j.personajeId);
             });
             this.state.faseActual = "LOBBY";
@@ -137,6 +179,13 @@ export class SpireRoom extends Room<SpireState> {
             this.state.jugadores.forEach((j) => {
                 j.mazoMaestro.clear();
                 obtenerMazoInicial(j.personajeId).forEach((id) => j.mazoMaestro.push(id));
+
+                // Cargar reliquia inicial exclusiva del personaje
+                j.reliquias.clear();
+                const info = PERSONAJES_INFO[j.personajeId];
+                if (info?.reliquiaInicial) {
+                    j.reliquias.push(info.reliquiaInicial);
+                }
                 j.nodoVotadoId = "";
             });
 
@@ -184,13 +233,11 @@ export class SpireRoom extends Room<SpireState> {
             }
         });
 
-        // Todavía faltan jugadores por votar
         if (votosEmitidos < totalJugadores) {
             this.cancelarCuentaRegresivaMapa();
             return;
         }
 
-        // Todos votaron: buscamos el máximo
         let maxVotos = 0;
         let candidatosGanadores: string[] = [];
 
@@ -203,23 +250,19 @@ export class SpireRoom extends Room<SpireState> {
             }
         });
 
-        // Caso Empate: se cancela el reloj hasta que alguien cambie su voto
         if (candidatosGanadores.length !== 1) {
             this.cancelarCuentaRegresivaMapa();
             this.state.hayEmpateMapa = true;
             return;
         }
 
-        // Hay un único ganador por mayoría
         const ganadorId = candidatosGanadores[0];
         this.state.hayEmpateMapa = false;
 
-        // Si el reloj ya estaba corriendo para este mismo nodo ganador, sigue sin reiniciarse
         if (this.timerMapa && this.state.nodoGanadorMapaId === ganadorId) {
             return;
         }
 
-        // Si no había reloj o cambió el nodo ganador, (re)iniciamos a 3 segundos
         this.iniciarCuentaRegresivaMapa(ganadorId);
     }
 
@@ -252,13 +295,9 @@ export class SpireRoom extends Room<SpireState> {
         const nodoElegido = this.state.nodosMapa.find((n) => n.id === nodoId);
         if (!nodoElegido) return;
 
-        // Marcar el nodo anterior como COMPLETADO y bloquear los caminos descartados de este piso
         this.state.nodosMapa.forEach((n) => {
-            if (n.estado === "ACTUAL") {
-                n.estado = "COMPLETADO";
-            } else if (n.estado === "DISPONIBLE" && n.id !== nodoElegido.id) {
-                n.estado = "BLOQUEADO";
-            }
+            if (n.estado === "ACTUAL") n.estado = "COMPLETADO";
+            else if (n.estado === "DISPONIBLE" && n.id !== nodoElegido.id) n.estado = "BLOQUEADO";
         });
 
         nodoElegido.estado = "ACTUAL";
@@ -266,25 +305,118 @@ export class SpireRoom extends Room<SpireState> {
         this.state.pisoActual = nodoElegido.piso;
         this.state.jugadores.forEach((j) => { j.nodoVotadoId = ""; });
 
-        // Ejecutar el evento según el tipo de nodo (escalable para futuros eventos)
         switch (nodoElegido.tipo) {
             case "JEFE":
-                this.iniciarCombate(true);
+                this.iniciarCombate("JEFE");
+                break;
+            case "ELITE":
+                this.iniciarCombate("ELITE");
+                break;
+            case "COFRE":
+                this.iniciarEventoCofre();
                 break;
             case "COMBATE":
             default:
-                this.iniciarCombate(false);
+                this.iniciarCombate("COMBATE");
                 break;
         }
     }
 
-    public iniciarCombate(esJefe: boolean = false) {
+    // ================= LÓGICA DE COFRE =================
+    private iniciarEventoCofre() {
+        this.cancelarCuentaRegresivaCofre();
+        this.state.cofreAbierto = false;
+        this.state.reliquiasCofre.clear();
+        this.state.jugadores.forEach((j) => { j.reliquiaCofreVotadaId = ""; });
+        this.state.faseActual = "CHEST";
+    }
+
+    private evaluarVotosCofre() {
+        const totalJugadores = this.state.jugadores.size;
+        if (totalJugadores === 0) return;
+
+        let elegidos = 0;
+        const conteoPorReliquia: Map<string, number> = new Map();
+        const paresFirma: string[] = [];
+
+        this.state.jugadores.forEach((j, sessionId) => {
+            if (j.reliquiaCofreVotadaId) {
+                elegidos++;
+                conteoPorReliquia.set(
+                    j.reliquiaCofreVotadaId,
+                    (conteoPorReliquia.get(j.reliquiaCofreVotadaId) || 0) + 1
+                );
+                paresFirma.push(`${sessionId}:${j.reliquiaCofreVotadaId}`);
+            }
+        });
+
+        // Revisar si dos o más jugadores votaron la misma reliquia
+        let hayColision = false;
+        conteoPorReliquia.forEach((cant) => {
+            if (cant > 1) hayColision = true;
+        });
+
+        this.state.hayConflictoCofre = hayColision;
+
+        if (elegidos < totalJugadores || hayColision) {
+            this.cancelarCuentaRegresivaCofre();
+            return;
+        }
+
+        // Todos eligieron reliquias distintas
+        const nuevaFirma = paresFirma.sort().join("|");
+        if (this.timerCofre && this.firmaVotosCofreActual === nuevaFirma) {
+            return;
+        }
+
+        this.iniciarCuentaRegresivaCofre(nuevaFirma);
+    }
+
+    private iniciarCuentaRegresivaCofre(firma: string) {
+        this.cancelarCuentaRegresivaCofre();
+        this.firmaVotosCofreActual = firma;
+        this.state.tiempoCuentaRegresivaCofre = CONFIG_MAPA.SEGUNDOS_CUENTA_REGRESIVA;
+
+        this.timerCofre = this.clock.setInterval(() => {
+            this.state.tiempoCuentaRegresivaCofre -= 1;
+            if (this.state.tiempoCuentaRegresivaCofre <= 0) {
+                this.cancelarCuentaRegresivaCofre();
+                this.entregarReliquiasCofreYAvanzar();
+            }
+        }, 1000);
+    }
+
+    private cancelarCuentaRegresivaCofre() {
+        if (this.timerCofre) {
+            this.timerCofre.clear();
+            this.timerCofre = null;
+        }
+        this.firmaVotosCofreActual = "";
+        this.state.tiempoCuentaRegresivaCofre = 0;
+    }
+
+    private entregarReliquiasCofreYAvanzar() {
+        this.state.jugadores.forEach((j) => {
+            if (j.reliquiaCofreVotadaId) {
+                j.reliquias.push(j.reliquiaCofreVotadaId);
+                j.reliquiaCofreVotadaId = "";
+            }
+        });
+
+        this.desbloquearSiguientesNodosMapa();
+        this.abrirFaseMapa();
+    }
+
+    // ================= LÓGICA DE COMBATE =================
+    public iniciarCombate(tipoCombate: "COMBATE" | "ELITE" | "JEFE" = "COMBATE") {
         this.state.faseActual = "COMBAT";
         this.state.turnoNumero = 1;
+        this.state.esCombateElite = tipoCombate === "ELITE";
+        this.state.esCombateJefe = tipoCombate === "JEFE";
         this.state.enemigos.clear();
 
         const cantidadJugadores = Math.max(1, this.state.jugadores.size);
-        const idsEnemigos = obtenerEncuentroAleatorio(esJefe, this.state.pisoActual);
+        const idsEnemigos = obtenerEncuentroAleatorio(tipoCombate, this.state.pisoActual);
 
         idsEnemigos.forEach((enemigoId, index) => {
             const info = ENEMIGOS_INFO[enemigoId];
@@ -306,7 +438,8 @@ export class SpireRoom extends Room<SpireState> {
             if (j.hp > 0) CombatEngine.prepararMazoCombate(j);
         });
 
-        this.iniciarNuevoTurnoJugadores();
+        // 1. Iniciar el Turno 1 de los jugadores
+        this.iniciarNuevoTurnoJugadores(true);
     }
 
     private verificarFinTurnoJugadores() {
@@ -317,6 +450,13 @@ export class SpireRoom extends Room<SpireState> {
 
         if (todosTerminaron) {
             CombatEngine.ejecutarTurnoEnemigos(this.state);
+
+            // Si los enemigos murieron por ESPINAS durante su propio ataque:
+            if (this.state.faseActual === "REWARD") {
+                this.prepararRecompensas();
+                return;
+            }
+            if (this.state.faseActual === "VICTORY") return;
 
             let hayAlgunVivo = false;
             this.state.jugadores.forEach((j) => {
@@ -332,18 +472,34 @@ export class SpireRoom extends Room<SpireState> {
             }
 
             this.state.turnoNumero += 1;
-            this.iniciarNuevoTurnoJugadores();
+            this.iniciarNuevoTurnoJugadores(false);
         }
     }
 
-    private iniciarNuevoTurnoJugadores() {
+    private iniciarNuevoTurnoJugadores(esInicioCombate: boolean = false) {
         this.state.jugadores.forEach((j) => {
             if (j.hp <= 0) return;
             j.bloqueo = 0;
             j.energia = j.energiaMax;
             j.turnoTerminado = false;
+            j.cartasJugadasTurno = 0;
+            j.ataquesJugadosTurno = 0;
             CombatEngine.robarCartas(j, 5);
         });
+
+        // Si es el turno 1, disparamos AL_INICIAR_COMBATE (después de resetear bloqueo a 0, así Distintivo de Abogado mantiene sus 10 de escudo)
+        if (esInicioCombate) {
+            RelicEngine.dispararParaTodos("AL_INICIAR_COMBATE", this.state);
+        }
+
+        // Disparar reliquias AL_INICIAR_TURNO (Cocoroch, Engranaje Par, Estandarte, etc.)
+        RelicEngine.dispararParaTodos("AL_INICIAR_TURNO", this.state);
+
+        // Por si una reliquia de inicio de turno (como Núcleo del Séptimo Turno) mata a todos los enemigos
+        CombatEngine.verificarVictoriaCombate(this.state);
+        if (this.state.faseActual === "REWARD") {
+            this.prepararRecompensas();
+        }
     }
 
     private prepararRecompensas() {
@@ -353,9 +509,16 @@ export class SpireRoom extends Room<SpireState> {
             }
             jugador.recompensaElegida = false;
             jugador.opcionesRecompensa.clear();
+            jugador.reliquiaRecompensa = "";
 
             const opciones = generarOpcionesRecompensa(jugador.personajeId, 3);
             opciones.forEach((id) => jugador.opcionesRecompensa.push(id));
+
+            // Si vencieron a un Élite, cada jugador recibe además 1 opción de reliquia
+            if (this.state.esCombateElite) {
+                const reliquias = obtenerReliquiasRecompensa(this.state.jugadores, 1, jugador.personajeId);
+                jugador.reliquiaRecompensa = reliquias[0] || "";
+            }
         });
     }
 

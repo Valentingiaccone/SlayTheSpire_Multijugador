@@ -36,7 +36,13 @@ export class MapNodeView extends Component {
         const estado: EstadoNodoMapa = nodoSchema.estado;
 
         if (this.labelTipo) {
-            this.labelTipo.string = tipo === "JEFE" ? "💀 JEFE" : "⚔️";
+            const iconos: Record<string, string> = {
+                COMBATE: "⚔️",
+                ELITE: "👹",
+                COFRE: "📦",
+                JEFE: "💀 JEFE"
+            };
+            this.labelTipo.string = iconos[tipo] || "❓";
         }
 
         if (this.boton) {

@@ -17,8 +17,6 @@ export class PlayerState extends Schema {
     @type("string") nombre: string = "";
     @type("string") personajeId: PersonajeId = "SHELLY";
     @type("boolean") listo: boolean = false;
-
-    // Nodo del mapa votado actualmente por este jugador ("" = sin voto)
     @type("string") nodoVotadoId: string = "";
 
     @type("number") hp: number = 80;
@@ -35,11 +33,23 @@ export class PlayerState extends Schema {
     @type("number") cantPilaRobo: number = 0;
     @type("number") cantDescarte: number = 0;
 
+    // Reliquias que posee el jugador
+    @type(["string"]) reliquias = new ArraySchema<string>();
+
+    // Recompensas post-combate
     @type(["string"]) opcionesRecompensa = new ArraySchema<string>();
+    @type("string") reliquiaRecompensa: string = ""; // Se llena al vencer un Élite
     @type("boolean") recompensaElegida: boolean = false;
 
+    // Elección actual en un evento de Cofre
+    @type("string") reliquiaCofreVotadaId: string = "";
+
+    // Variables internas del servidor para evaluar triggers de reliquias
     pilaRoboInterna: string[] = [];
     descarteInterno: string[] = [];
+    cartasJugadasTurno: number = 0;
+    ataquesJugadosTurno: number = 0;
+    cartasJugadasCombate: number = 0;
 
     aplicarDatosPersonaje(id: PersonajeId) {
         const info = PERSONAJES_INFO[id];
@@ -61,7 +71,6 @@ export class EnemyState extends Schema {
     @type("number") bloqueo: number = 0;
     @type("string") intencionTipo: TipoIntencion = "ATACAR";
     @type("number") intencionValor: number = 0;
-
     @type({ map: "number" }) estados = new MapSchema<number>();
 
     indicePatron: number = 0;
@@ -71,14 +80,22 @@ export class SpireState extends Schema {
     @type("string") faseActual: FaseSala = "LOBBY";
     @type("number") pisoActual: number = 1;
     @type("number") turnoNumero: number = 1;
+    @type("boolean") esCombateElite: boolean = false;
+    @type("boolean") esCombateJefe: boolean = false;
 
     @type({ map: PlayerState }) jugadores = new MapSchema<PlayerState>();
     @type([EnemyState]) enemigos = new ArraySchema<EnemyState>();
 
-    // Estado del Mapa y Votación
+    // Mapa
     @type([MapNodeState]) nodosMapa = new ArraySchema<MapNodeState>();
     @type("string") nodoActualId: string = "";
     @type("string") nodoGanadorMapaId: string = "";
     @type("number") tiempoCuentaRegresivaMapa: number = 0;
     @type("boolean") hayEmpateMapa: boolean = false;
+
+    // Evento Cofre
+    @type("boolean") cofreAbierto: boolean = false;
+    @type(["string"]) reliquiasCofre = new ArraySchema<string>();
+    @type("number") tiempoCuentaRegresivaCofre: number = 0;
+    @type("boolean") hayConflictoCofre: boolean = false;
 }
