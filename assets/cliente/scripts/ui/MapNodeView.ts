@@ -42,7 +42,7 @@ export class MapNodeView extends Component {
                 COFRE: "📦",
                 JEFE: "💀 JEFE",
                 HOGUERA: "🔥",
-                TIENDA: "🛒"
+                TIENDA: "💰"
             };
             this.labelTipo.string = iconos[tipo] || "❓";
         }
