@@ -60,14 +60,14 @@ export const CARTAS_COMBATE: ICartaData[] = [
         id: "cobertura_aliada",
         nombre: "Cobertura",
         costo: 1,
-        descripcion: "Otorga 9 de bloqueo a un aliado. Roba 1 carta.",
+        descripcion: "Otorga 7 de bloqueo a un aliado. Roba 1 carta.",
         objetivoSeleccion: "ALIADO",
         clase: "combate",
         sprite: "cobertura_combate",
         enPoolRecompensa: true,
         tipo: "HABILIDAD",
         efectos: [
-            { tipo: "BLOQUEO", valor: 9, objetivo: "ALIADO" },
+            { tipo: "BLOQUEO", valor: 7, objetivo: "ALIADO" },
             { tipo: "ROBAR_CARTA", valor: 1, objetivo: "PROPIO" }
         ]
     },
@@ -97,6 +97,50 @@ export const CARTAS_COMBATE: ICartaData[] = [
         efectos: [
             { tipo: "DANIO", valor: 5, objetivo: "ENEMIGO" },
             { tipo: "BLOQUEO", valor: 5, objetivo: "PROPIO" }
+        ]
+    },
+    {
+        id: "golpe_fuerte_combate",
+        nombre: "Golpe fuerte",
+        costo: 1,
+        descripcion: "Inflige 9 de daño. Roba 1 carta.",
+        clase: "combate",
+        sprite: "golpe_fuerte_combate",
+        enPoolRecompensa: true,
+        objetivoSeleccion: "ENEMIGO",
+        tipo: "ATAQUE",
+        efectos: [
+            { tipo: "DANIO", valor: 9, objetivo: "ENEMIGO" },
+            { tipo: "ROBAR_CARTA", valor: 1, objetivo: "PROPIO" }
+        ]
+    },
+    {
+        id: "escudo_rectangular",
+        nombre: "Escudo rectangular",
+        costo: 1,
+        descripcion: "Gana 8 de bloqueo. Roba 1 carta.",
+        clase: "combate",
+        sprite: "escudo_rectangular",
+        enPoolRecompensa: true,
+        tipo: "HABILIDAD",
+        efectos: [
+            { tipo: "BLOQUEO", valor: 8, objetivo: "PROPIO" },
+            { tipo: "ROBAR_CARTA", valor: 1, objetivo: "PROPIO" }
+        ]
+    },
+    {
+        id: "golpe_boomerang",
+        nombre: "Golpe boomerang",
+        costo: 1,
+        descripcion: "Inflige 3 de daño a un enemigo aleatorio 3 veces.",
+        clase: "combate",
+        sprite: "golpe_boomerang",
+        enPoolRecompensa: true,
+        tipo: "HABILIDAD",
+        efectos: [
+            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO" },
+            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO" },
+            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO" }
         ]
     },
 ]

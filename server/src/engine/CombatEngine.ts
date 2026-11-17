@@ -47,11 +47,16 @@ const EFECTO_HANDLERS: Record<TipoEfecto, EfectoHandler> = {
 function resolverObjetivos(state: SpireState, lanzador: PlayerState, tipo: string, objetivoId?: string): EntidadCombate[] {
     switch (tipo) {
         case "PROPIO":
-            let x = 1
             return [lanzador];
         case "ENEMIGO": {
             const enemigo = state.enemigos.find((e) => e.uid === objetivoId && e.hp > 0);
             return enemigo ? [enemigo] : [];
+        }
+        case "ENEMIGO_ALEATORIO": {
+            const vivos = state.enemigos.filter((e) => e.hp > 0);
+            if (vivos.length === 0) return [];
+            const indiceAleatorio = Math.floor(Math.random() * vivos.length);
+            return [vivos[indiceAleatorio]];
         }
         case "TODOS_ENEMIGOS":
             return state.enemigos.filter((e) => e.hp > 0);
@@ -61,7 +66,9 @@ function resolverObjetivos(state: SpireState, lanzador: PlayerState, tipo: strin
         }
         case "TODOS_ALIADOS": {
             const vivos: PlayerState[] = [];
-            state.jugadores.forEach((j) => { if (j.hp > 0) vivos.push(j); });
+            state.jugadores.forEach((j) => {
+                if (j.hp > 0) vivos.push(j);
+            });
             return vivos;
         }
         default:
