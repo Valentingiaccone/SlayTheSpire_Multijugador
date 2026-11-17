@@ -4,13 +4,16 @@ import {
     MENSAJES,
     PersonajeId,
     PERSONAJES_INFO,
-    EventoVisualCombate
+    EventoVisualCombate,
+    TipoAccionFogata
 } from "../../../assets/cliente/compartido/GameTypes";
 import { obtenerMazoInicial } from "../../../assets/cliente/compartido/Cartas";
 import { TipoNodoMapa } from "../../../assets/cliente/compartido/Mapa";
 import { MapService } from "./services/MapService";
 import { ChestService } from "./services/ChestService";
 import { RewardService } from "./services/RewardService";
+import { CampfireService } from "./services/CampfireService";
+import { ShopService } from "./services/ShopService";
 import { CombatCoordinator } from "./services/CombatCoordinator";
 
 export class SpireRoom extends Room<SpireState> {
@@ -19,24 +22,25 @@ export class SpireRoom extends Room<SpireState> {
     private mapService!: MapService;
     private chestService!: ChestService;
     private rewardService!: RewardService;
+    private campfireService!: CampfireService;
+    private shopService!: ShopService;
     private combatCoordinator!: CombatCoordinator;
 
     onCreate(): void {
         this.setState(new SpireState());
 
+        const avanzarAlMapa = () => {
+            this.mapService.desbloquearSiguientesNodos();
+            this.mapService.abrirFaseMapa();
+        };
+
         this.mapService = new MapService(this.state, this.clock, (tipoNodo) =>
             this.alViajarANodo(tipoNodo)
         );
-
-        this.chestService = new ChestService(this.state, this.clock, () => {
-            this.mapService.desbloquearSiguientesNodos();
-            this.mapService.abrirFaseMapa();
-        });
-
-        this.rewardService = new RewardService(this.state, () => {
-            this.mapService.desbloquearSiguientesNodos();
-            this.mapService.abrirFaseMapa();
-        });
+        this.chestService = new ChestService(this.state, this.clock, avanzarAlMapa);
+        this.rewardService = new RewardService(this.state, avanzarAlMapa);
+        this.campfireService = new CampfireService(this.state, avanzarAlMapa);
+        this.shopService = new ShopService(this.state, avanzarAlMapa);
 
         this.combatCoordinator = new CombatCoordinator(
             this.state,
@@ -85,6 +89,12 @@ export class SpireRoom extends Room<SpireState> {
             case "CHEST":
                 if (this.state.cofreAbierto) this.chestService.evaluarVotos();
                 break;
+            case "CAMPFIRE":
+                this.campfireService.verificarFinFogata();
+                break;
+            case "SHOP":
+                this.shopService.verificarFinTienda();
+                break;
         }
     }
 
@@ -122,11 +132,15 @@ export class SpireRoom extends Room<SpireState> {
 
         this.onMessage(
             MENSAJES.ELEGIR_RECOMPENSA,
-            (client, data: { cartaId: string | null; tomarReliquia?: boolean }) => {
+            (
+                client,
+                data: { cartaId: string | null; tomarReliquia?: boolean; tomarOro?: boolean }
+            ) => {
                 this.rewardService.elegirRecompensa(
                     client.sessionId,
                     data?.cartaId ?? null,
-                    Boolean(data?.tomarReliquia)
+                    Boolean(data?.tomarReliquia),
+                    Boolean(data?.tomarOro)
                 );
             }
         );
@@ -138,6 +152,62 @@ export class SpireRoom extends Room<SpireState> {
         this.onMessage(MENSAJES.VOTAR_RELIQUIA_COFRE, (client, data: { reliquiaId: string }) => {
             if (!data?.reliquiaId) return;
             this.chestService.votarReliquia(client.sessionId, data.reliquiaId);
+        });
+
+        this.onMessage(MENSAJES.ACCION_FOGATA, (client, data: TipoAccionFogata) => {
+            this.campfireService.procesarAccionFogata(client.sessionId, data);
+        });
+
+        this.onMessage(MENSAJES.COMPRAR_CARTA_TIENDA, (client, data: { indiceTienda: number }) => {
+            if (typeof data?.indiceTienda !== "number") return;
+            this.shopService.comprarCarta(client.sessionId, data.indiceTienda);
+        });
+
+        this.onMessage(MENSAJES.COMPRAR_RELIQUIA_TIENDA, (client, data: { indiceReliquia: number }) => {
+            if (typeof data?.indiceReliquia !== "number") return;
+            this.shopService.comprarReliquia(client.sessionId, data.indiceReliquia);
+        });
+
+        this.onMessage(MENSAJES.ELIMINAR_CARTA_TIENDA, (client, data: { indiceMazo: number }) => {
+            if (typeof data?.indiceMazo !== "number") return;
+            this.shopService.eliminarCartaMazo(client.sessionId, data.indiceMazo);
+        });
+
+        this.onMessage(MENSAJES.SALIR_TIENDA, (client) => {
+            this.shopService.salirTienda(client.sessionId);
+        });
+
+        // ================= ATAJOS DE DESARROLLO LOCAL (SOLO PARA TESTEO) =================
+        this.onMessage("debug_comando", (client, data: { accion: string }) => {
+            const jugador = this.state.jugadores.get(client.sessionId);
+            if (!jugador || !data?.accion) return;
+
+            switch (data.accion) {
+                case "IR_FOGATA":
+                    this.campfireService.iniciarEventoFogata();
+                    break;
+                case "IR_TIENDA":
+                    jugador.oro += 300;
+                    this.shopService.iniciarEventoTienda();
+                    break;
+                case "IR_COFRE":
+                    this.chestService.iniciarEventoCofre();
+                    break;
+                case "GANAR_COMBATE":
+                    if (this.state.faseActual === "COMBAT") {
+                        this.state.enemigos.forEach((e) => {
+                            e.hp = 0;
+                        });
+                        this.rewardService.prepararRecompensas();
+                        this.state.faseActual = "REWARD";
+                    }
+                    break;
+                case "BUFF_TEST":
+                    jugador.energia += 5;
+                    jugador.oro += 100;
+                    jugador.estados.set("FUERZA", (jugador.estados.get("FUERZA") || 0) + 10);
+                    break;
+            }
         });
 
         this.onMessage(MENSAJES.REINICIAR_PARTIDA, (client) => {
@@ -156,6 +226,11 @@ export class SpireRoom extends Room<SpireState> {
                 j.listo = false;
                 j.nodoVotadoId = "";
                 j.reliquiaCofreVotadaId = "";
+                j.fogataCompletada = false;
+                j.tiendaCompletada = false;
+                j.tiendaEliminacionUsada = false;
+                j.tiendaCartas.clear();
+                j.tiendaReliquias.clear();
                 j.reliquias.clear();
                 j.aplicarDatosPersonaje(j.personajeId);
             });
@@ -174,6 +249,7 @@ export class SpireRoom extends Room<SpireState> {
         if (!todosListos) return;
 
         this.state.jugadores.forEach((j) => {
+            j.aplicarDatosPersonaje(j.personajeId);
             j.mazoMaestro.clear();
             obtenerMazoInicial(j.personajeId).forEach((id) => j.mazoMaestro.push(id));
 
@@ -198,6 +274,12 @@ export class SpireRoom extends Room<SpireState> {
                 break;
             case "COFRE":
                 this.chestService.iniciarEventoCofre();
+                break;
+            case "HOGUERA":
+                this.campfireService.iniciarEventoFogata();
+                break;
+            case "TIENDA":
+                this.shopService.iniciarEventoTienda();
                 break;
             case "COMBATE":
             default:

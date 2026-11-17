@@ -1,5 +1,6 @@
-import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite } from "cc";
+import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite, Color } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
+import { CalculadoraCombate, IMapaEstadosLectura } from "../../compartido/CalculadoraCombate";
 import { SpriteManager } from "../utils/SpriteManager";
 
 const { ccclass, property } = _decorator;
@@ -16,16 +17,17 @@ export class CardView extends Component {
     private cartaData: ICartaData | null = null;
     private posOriginal: Vec3 = new Vec3();
     private arrastrando: boolean = false;
+    private arrastreHabilitado: boolean = true;
+
+    private estadosLanzadorActual: IMapaEstadosLectura | undefined = undefined;
+    private ultimoObjetivoHoverId: string | undefined = undefined;
 
     private onSolicitarJugar: ((indiceMano: number, objetivoId?: string) => void) | null = null;
     private buscarObjetivoEnPunto: ((tipo: "ENEMIGO" | "ALIADO", touchPosWorld: Vec3) => string | undefined) | null = null;
+    private obtenerEstadosObjetivo: ((objetivoId: string) => IMapaEstadosLectura | undefined) | null = null;
 
     public get estaArrastrando(): boolean {
         return this.arrastrando;
-    }
-
-    public get idCartaActual(): string | undefined {
-        return this.cartaData?.id;
     }
 
     onLoad() {
@@ -35,52 +37,137 @@ export class CardView extends Component {
         this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
     }
 
+    /**
+     * Configuración para cartas en la mano durante el combate (con drag & drop y cálculo dinámico).
+     */
     public configurar(
         indice: number,
         data: ICartaData,
         puedePagarse: boolean,
         onJugar: (indiceMano: number, objetivoId?: string) => void,
-        buscarObjetivo: (tipo: "ENEMIGO" | "ALIADO", pos: Vec3) => string | undefined
+        buscarObjetivo: (tipo: "ENEMIGO" | "ALIADO", pos: Vec3) => string | undefined,
+        estadosLanzador?: IMapaEstadosLectura,
+        obtenerEstadosObjetivo?: (objetivoId: string) => IMapaEstadosLectura | undefined,
+        permitirArrastre: boolean = true
     ) {
         this.indiceMano = indice;
         this.onSolicitarJugar = onJugar;
         this.buscarObjetivoEnPunto = buscarObjetivo;
+        this.estadosLanzadorActual = estadosLanzador;
+        this.obtenerEstadosObjetivo = obtenerEstadosObjetivo || null;
+        this.arrastreHabilitado = permitirArrastre;
 
-        // Si el jugador está arrastrando esta misma carta en este instante, solo actualizamos su índice sin resetear su posición ni escala
         if (this.arrastrando && this.cartaData?.id === data.id) {
+            this.refrescarTextoDinamico(
+                this.ultimoObjetivoHoverId
+                    ? this.obtenerEstadosObjetivo?.(this.ultimoObjetivoHoverId)
+                    : undefined
+            );
             return;
         }
 
-        const cambioDeCarta = this.cartaData?.id !== data.id;
+        const cambioDeSprite = this.cartaData?.sprite !== data.sprite;
         this.cartaData = data;
 
         if (this.labelCosto) this.labelCosto.string = `${data.costo}`;
-        if (this.labelNombre) this.labelNombre.string = data.nombre;
-        if (this.labelDescripcion) this.labelDescripcion.string = data.descripcion;
+        if (this.labelNombre) {
+            this.labelNombre.string = data.nombre;
+            this.labelNombre.color = data.esMejorada
+                ? new Color(130, 255, 140)
+                : new Color(255, 255, 255);
+        }
         if (this.labelTipo) this.labelTipo.string = data.tipo;
+
+        this.refrescarTextoDinamico(undefined);
 
         const escala = puedePagarse ? 1 : 0.92;
         this.node.setScale(escala, escala, 1);
 
-        if (cambioDeCarta) {
+        if (cambioDeSprite) {
             SpriteManager.aplicarSprite(this.imagen, "cartas", data.sprite);
         }
     }
 
+    /**
+     * Configuración para mostrar la carta en menús (Visor de Mazo, Forja, Tienda, Recompensas)
+     * desactivando el arrastre para permitir el scroll vertical y los clics de selección.
+     */
+    public configurarModoEstatico(data: ICartaData, escala: number = 1) {
+        this.arrastrando = false;
+        this.ulpimoHoverReset();
+        this.configurar(
+            -1,
+            data,
+            true,
+            () => {},
+            () => undefined,
+            undefined,
+            undefined,
+            false
+        );
+        this.node.setScale(escala, escala, 1);
+    }
+
+    private ulpimoHoverReset() {
+        this.ultimoObjetivoHoverId = undefined;
+    }
+
+    private refrescarTextoDinamico(estadosObjetivo?: IMapaEstadosLectura) {
+        if (!this.cartaData || !this.labelDescripcion) return;
+
+        const resultado = CalculadoraCombate.formatearDescripcionCarta(
+            this.cartaData.descripcion,
+            this.cartaData.efectos,
+            this.estadosLanzadorActual,
+            estadosObjetivo
+        );
+
+        this.labelDescripcion.string = resultado.texto;
+
+        if (resultado.estadoDanio === "AUMENTADO" || resultado.estadoBloqueo === "AUMENTADO") {
+            this.labelDescripcion.color = new Color(135, 255, 145);
+        } else if (resultado.estadoDanio === "REDUCIDO" || resultado.estadoBloqueo === "REDUCIDO") {
+            this.labelDescripcion.color = new Color(255, 130, 130);
+        } else {
+            this.labelDescripcion.color = new Color(255, 255, 255);
+        }
+    }
+
     private onTouchStart() {
+        if (!this.arrastreHabilitado) return;
         this.arrastrando = true;
+        this.ultimoObjetivoHoverId = undefined;
         this.posOriginal.set(this.node.position);
     }
 
     private onTouchMove(event: EventTouch) {
-        if (!this.arrastrando) return;
+        if (!this.arrastreHabilitado || !this.arrastrando || !this.cartaData) return;
         const delta = event.getUIDelta();
         this.node.setPosition(this.node.position.x + delta.x, this.node.position.y + delta.y, 0);
+
+        // Si la carta apunta a un enemigo o ataca enemigos, recalculamos en vivo al pasar sobre uno
+        if (this.buscarObjetivoEnPunto && this.obtenerEstadosObjetivo) {
+            const uiPos = event.getUILocation();
+            const enemigoBajoCursorId = this.buscarObjetivoEnPunto(
+                "ENEMIGO",
+                new Vec3(uiPos.x, uiPos.y, 0)
+            );
+
+            if (enemigoBajoCursorId !== this.ultimoObjetivoHoverId) {
+                this.ultimoObjetivoHoverId = enemigoBajoCursorId;
+                const estadosEnemigo = enemigoBajoCursorId
+                    ? this.obtenerEstadosObjetivo(enemigoBajoCursorId)
+                    : undefined;
+                this.refrescarTextoDinamico(estadosEnemigo);
+            }
+        }
     }
 
     private onTouchEnd(event: EventTouch) {
-        if (!this.arrastrando || !this.cartaData) return;
+        if (!this.arrastreHabilitado || !this.arrastrando || !this.cartaData) return;
         this.arrastrando = false;
+        this.ultimoObjetivoHoverId = undefined;
+        this.refrescarTextoDinamico(undefined);
 
         const desplazamientoY = this.node.position.y - this.posOriginal.y;
         this.node.setPosition(this.posOriginal);

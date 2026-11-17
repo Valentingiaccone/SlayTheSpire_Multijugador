@@ -18,13 +18,13 @@ export interface IReliquiaData {
     icono: string;
     clase: ClaseId | "neutral";
     enPoolRecompensa: boolean;
+    precioTienda?: number;
     trigger: TriggerReliquia;
     condicion?: DescriptorCondicion;
     efectos: DescriptorEfecto[];
 }
 
 export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
-    // ================= RELIQUIAS INICIALES =================
     bandita: {
         id: "bandita",
         nombre: "Bandita",
@@ -32,6 +32,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_bandita",
         clase: "shelly",
         enPoolRecompensa: false,
+        precioTienda: 140,
         trigger: "AL_FINALIZAR_COMBATE",
         efectos: [{ tipo: "CURAR_HP", valor: 8, objetivo: "PROPIO" }]
     },
@@ -42,11 +43,10 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_cocoroch",
         clase: "crow",
         enPoolRecompensa: false,
+        precioTienda: 150,
         trigger: "AL_INFLIGIR_DANIO",
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "ENEMIGO", estadoId: "VENENO" }]
     },
-
-    // ================= RELIQUIAS DE ASESINO ===============
     dinamita: {
         id: "dinamita",
         nombre: "Dinamita",
@@ -54,12 +54,11 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_dinamita",
         clase: "asesino",
         enPoolRecompensa: true,
+        precioTienda: 150,
         trigger: "AL_JUGAR_CARTA",
         condicion: { tipo: "CARTAS_TURNO_MULTIPLO", divisor: 3 },
         efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS", fuente: "RELIQUIA" }]
     },
-
-    // ================= RELIQUIAS DE COMBATE ===============
     sangre_vengativa: {
         id: "sangre_vengativa",
         nombre: "Sangre Vengativa",
@@ -67,12 +66,11 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_sangre_vengativa",
         clase: "combate",
         enPoolRecompensa: true,
+        precioTienda: 160,
         trigger: "AL_RECIBIR_DANIO",
         condicion: { tipo: "DANIO_RECIBIDO_MAYOR_A", minimo: 0 },
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "PROPIO", estadoId: "FUERZA" }]
     },
-
-    // ================= RELIQUIAS DEL POOL =================
     distintivo_abogado: {
         id: "distintivo_abogado",
         nombre: "Distintivo de Abogado",
@@ -80,6 +78,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_distintivo_abogado",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 125,
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "BLOQUEO", valor: 10, objetivo: "PROPIO" }]
     },
@@ -90,6 +89,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_espinas",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 140,
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 3, objetivo: "PROPIO", estadoId: "ESPINAS" }]
     },
@@ -100,6 +100,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_mancuernas",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 155,
         trigger: "AL_TERMINAR_TURNO",
         condicion: { tipo: "ATAQUES_TURNO_IGUAL", cantidad: 0 },
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 2, objetivo: "PROPIO", estadoId: "FUERZA" }]
@@ -111,6 +112,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_pala",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 135,
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "TODOS_ENEMIGOS", estadoId: "VULNERABLE" }]
     },
@@ -121,6 +123,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_cofre_clash",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 145,
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "ROBAR_CARTA", valor: 2, objetivo: "PROPIO" }]
     },
@@ -131,6 +134,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_girasol",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 165,
         trigger: "AL_INICIAR_TURNO",
         condicion: { tipo: "TURNO_MULTIPLO", divisor: 3 },
         efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
@@ -142,6 +146,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_spooky",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 140,
         trigger: "AL_INICIAR_TURNO",
         condicion: { tipo: "TURNO_EXACTO", turno: 2 },
         efectos: [{ tipo: "BLOQUEO", valor: 8, objetivo: "TODOS_ALIADOS" }]
@@ -153,6 +158,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_oso_en_punto",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 150,
         trigger: "AL_INICIAR_TURNO",
         condicion: { tipo: "TURNO_EXACTO", turno: 8 },
         efectos: [{ tipo: "DANIO", valor: 50, objetivo: "TODOS_ENEMIGOS", fuente: "RELIQUIA" }]
@@ -164,6 +170,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_sanacion",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 115,
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "CURAR_HP", valor: 2, objetivo: "PROPIO" }]
     },
@@ -174,6 +181,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_elixir",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 155,
         trigger: "AL_INICIAR_COMBATE",
         efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
     },
@@ -184,11 +192,16 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         icono: "reliquia_reloj_par",
         clase: "neutral",
         enPoolRecompensa: true,
+        precioTienda: 135,
         trigger: "AL_INICIAR_TURNO",
         condicion: { tipo: "TURNO_PARIDAD", esPar: true },
         efectos: [{ tipo: "BLOQUEO", valor: 4, objetivo: "PROPIO" }]
     }
 };
+
+export function obtenerPrecioReliquia(reliquiaId: string): number {
+    return CATALOGO_RELIQUIAS[reliquiaId]?.precioTienda ?? 145;
+}
 
 export interface IPortadorReliquiasMinimo {
     personajeId: PersonajeId | string;

@@ -1,5 +1,6 @@
 import { _decorator, Component, Node, Label, Color, Vec3, tween, UITransform, Vec2 } from "cc";
 import { IEnemigoCliente, IJugadorCliente, IMapaEstadosCliente } from "../../compartido/GameTypes";
+import { CalculadoraCombate } from "../../compartido/CalculadoraCombate";
 
 const { ccclass } = _decorator;
 
@@ -12,7 +13,6 @@ export class CombatEntityView extends Component {
     private posBase: Vec3 = new Vec3();
     private posBaseCapturada: boolean = false;
 
-    // Estado visual interpolado para que onStateChange no adelante el resultado antes de la animación
     private hpMostrado: number = 0;
     private hpMaxMostrado: number = 0;
     private bloqueoMostrado: number = 0;
@@ -41,17 +41,33 @@ export class CombatEntityView extends Component {
         return uiTrans.getBoundingBoxToWorld().contains(new Vec2(puntoMundo.x, puntoMundo.y));
     }
 
-    public sincronizarEnemigo(enemigo: IEnemigoCliente, bloquearHpYBloqueo: boolean): void {
+    public sincronizarEnemigo(
+        enemigo: IEnemigoCliente,
+        bloquearHpYBloqueo: boolean,
+        estadosMiJugador?: IMapaEstadosCliente
+    ): void {
         this.entidadId = enemigo.uid;
         this.esEnemigo = true;
         this.nombreMostrado = enemigo.nombre;
         this.hpMaxMostrado = enemigo.hpMax;
         this.estadosTexto = this.formatearEstados(enemigo.estados);
 
-        this.intencionTexto =
-            enemigo.intencionTipo === "ATACAR"
-                ? `⚔️ Ataca por ${enemigo.intencionValor} (a TODOS)`
-                : `🛡️ Se cubrirá +${enemigo.intencionValor}`;
+        if (enemigo.intencionTipo === "ATACAR") {
+            const danioReal = CalculadoraCombate.calcularDanioAtaque(
+                enemigo.intencionValor,
+                enemigo.estados,
+                estadosMiJugador
+            );
+            const indicador =
+                danioReal > enemigo.intencionValor
+                    ? "▲"
+                    : danioReal < enemigo.intencionValor
+                    ? "▼"
+                    : "";
+            this.intencionTexto = `⚔️ Ataca por ${danioReal}${indicador} (a TODOS)`;
+        } else {
+            this.intencionTexto = `🛡️ Se cubrirá +${enemigo.intencionValor}`;
+        }
 
         if (!bloquearHpYBloqueo) {
             this.hpMostrado = enemigo.hp;
@@ -123,7 +139,12 @@ export class CombatEntityView extends Component {
         });
     }
 
-    public animarImpacto(danioAlHp: number, danioBloqueado: number, hpRestante: number, bloqueoRestante: number): Promise<void> {
+    public animarImpacto(
+        danioAlHp: number,
+        danioBloqueado: number,
+        hpRestante: number,
+        bloqueoRestante: number
+    ): Promise<void> {
         return new Promise((resolve) => {
             this.aplicarValoresVisuales(hpRestante, bloqueoRestante);
 

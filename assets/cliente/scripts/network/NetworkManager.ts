@@ -1,13 +1,13 @@
 import { _decorator, Component, EventTarget } from "cc";
-import type { Client, Room } from "colyseus.js";
 import {
     MENSAJES,
     PersonajeId,
     IEstadoSalaCliente,
-    EventoVisualCombate
+    EventoVisualCombate,
+    TipoAccionFogata
 } from "../../compartido/GameTypes";
 
-const { ccclass } = _decorator;
+const { ccclass, property } = _decorator;
 
 export const NetworkEvents = new EventTarget();
 export const EVENTO_ESTADO_ACTUALIZADO = "estado_actualizado";
@@ -17,8 +17,11 @@ export const EVENTO_SECUENCIA_COMBATE = "secuencia_combate";
 export class NetworkManager extends Component {
     public static instance: NetworkManager | null = null;
 
-    private client: Client | null = null;
-    public room: Room<IEstadoSalaCliente> | null = null;
+    @property
+    public usarServidorLocal: boolean = true;
+
+    private client: any = null;
+    public room: any = null;
 
     onLoad() {
         if (NetworkManager.instance) {
@@ -30,15 +33,18 @@ export class NetworkManager extends Component {
 
     public async conectarYSala(nombreJugador: string) {
         try {
-            const ColyseusLib = (window as unknown as { Colyseus: { Client: new (url: string) => Client } }).Colyseus;
-            // this.client = new ColyseusLib.Client("ws://localhost:2567");
-            this.client = new ColyseusLib.Client("https://slaythespire-multijugador.onrender.com");
-            this.room = await this.client.joinOrCreate<IEstadoSalaCliente>("spire_room", {
+            const Colyseus = (window as any).Colyseus;
+            const urlServidor = this.usarServidorLocal
+                ? "ws://localhost:2567"
+                : "[https://slaythespire-multijugador.onrender.com](https://slaythespire-multijugador.onrender.com)";
+
+            this.client = new Colyseus.Client(urlServidor);
+            this.room = await this.client.joinOrCreate("spire_room", {
                 nombre: nombreJugador
             });
             console.log("Conectado a la sala:", this.room.roomId, "Mi ID:", this.room.sessionId);
 
-            this.room.onStateChange((state) => {
+            this.room.onStateChange((state: IEstadoSalaCliente) => {
                 NetworkEvents.emit(EVENTO_ESTADO_ACTUALIZADO, state);
             });
 
@@ -66,8 +72,12 @@ export class NetworkManager extends Component {
         this.room?.send(MENSAJES.JUGAR_CARTA, { indiceMano, objetivoId });
     }
 
-    public elegirRecompensa(cartaId: string | null, tomarReliquia: boolean = false) {
-        this.room?.send(MENSAJES.ELEGIR_RECOMPENSA, { cartaId, tomarReliquia });
+    public elegirRecompensa(
+        cartaId: string | null,
+        tomarReliquia: boolean = false,
+        tomarOro: boolean = false
+    ) {
+        this.room?.send(MENSAJES.ELEGIR_RECOMPENSA, { cartaId, tomarReliquia, tomarOro });
     }
 
     public abrirCofre() {
@@ -76,6 +86,26 @@ export class NetworkManager extends Component {
 
     public votarReliquiaCofre(reliquiaId: string) {
         this.room?.send(MENSAJES.VOTAR_RELIQUIA_COFRE, { reliquiaId });
+    }
+
+    public enviarAccionFogata(accion: TipoAccionFogata) {
+        this.room?.send(MENSAJES.ACCION_FOGATA, accion);
+    }
+
+    public comprarCartaTienda(indiceTienda: number) {
+        this.room?.send(MENSAJES.COMPRAR_CARTA_TIENDA, { indiceTienda });
+    }
+
+    public comprarReliquiaTienda(indiceReliquia: number) {
+        this.room?.send(MENSAJES.COMPRAR_RELIQUIA_TIENDA, { indiceReliquia });
+    }
+
+    public eliminarCartaTienda(indiceMazo: number) {
+        this.room?.send(MENSAJES.ELIMINAR_CARTA_TIENDA, { indiceMazo });
+    }
+
+    public salirTienda() {
+        this.room?.send(MENSAJES.SALIR_TIENDA);
     }
 
     public reiniciarPartida() {

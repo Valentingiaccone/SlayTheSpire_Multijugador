@@ -1,4 +1,3 @@
-import { _decorator, Component, Node, Label } from "cc";
 import {
     NetworkManager,
     NetworkEvents,
@@ -6,6 +5,8 @@ import {
     EVENTO_SECUENCIA_COMBATE
 } from "../network/NetworkManager";
 import { FaseSala, IEstadoSalaCliente, EventoVisualCombate } from "../../compartido/GameTypes";
+import { DeckViewerController } from "./DeckViewerController";
+import { _decorator, Component, Node, Label, input, Input, EventKeyboard, KeyCode } from "cc";
 
 const { ccclass, property } = _decorator;
 
@@ -15,11 +16,16 @@ export class UIManager extends Component {
     @property(Node) panelMapa: Node = null!;
     @property(Node) panelCombate: Node = null!;
     @property(Node) panelRecompensa: Node = null!;
+    @property(Node) panelCofre: Node = null!;
+    @property(Node) panelFogata: Node = null!;
+    @property(Node) panelTienda: Node = null!;
     @property(Node) panelFinPartida: Node = null!;
     @property(Label) labelFinPartida: Label = null!;
-    @property(Node) panelCofre: Node = null!;
+
     @property(Node) barraSuperiorReliquias: Node = null!;
     @property(Node) btnToggleMapa: Node = null!;
+    @property(Node) btnToggleMazo: Node = null!;
+    @property(DeckViewerController) visorMazo: DeckViewerController = null!;
 
     private mapaAbiertoEnConsulta: boolean = false;
     private ultimaFaseAplicada: FaseSala | "" = "";
@@ -29,6 +35,30 @@ export class UIManager extends Component {
     onLoad() {
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoActualizado, this);
         NetworkEvents.on(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
+        input.on(Input.EventType.KEY_DOWN, this.onTeclaDebugPresionada, this);
+    }
+
+    private onTeclaDebugPresionada(event: EventKeyboard) {
+        const room = NetworkManager.instance?.room;
+        if (!room) return;
+
+        switch (event.keyCode) {
+            case KeyCode.DIGIT_1:
+                room.send("debug_comando", { accion: "IR_FOGATA" });
+                break;
+            case KeyCode.DIGIT_2:
+                room.send("debug_comando", { accion: "IR_TIENDA" });
+                break;
+            case KeyCode.DIGIT_3:
+                room.send("debug_comando", { accion: "IR_COFRE" });
+                break;
+            case KeyCode.DIGIT_4:
+                room.send("debug_comando", { accion: "GANAR_COMBATE" });
+                break;
+            case KeyCode.DIGIT_5:
+                room.send("debug_comando", { accion: "BUFF_TEST" });
+                break;
+        }
     }
 
     async start() {
@@ -46,7 +76,6 @@ export class UIManager extends Component {
 
     private onSecuenciaRecibida(eventos: EventoVisualCombate[]) {
         if (!eventos || eventos.length === 0) return;
-        // Estimamos ~220ms por evento visual para no cortar el golpe final antes de mostrar Recompensas
         const duracionMs = Math.min(2500, eventos.length * 220 + 250);
         this.timestampFinSecuenciaEstimado = Math.max(
             this.timestampFinSecuenciaEstimado,
@@ -83,21 +112,36 @@ export class UIManager extends Component {
         }
 
         this.mapaAbiertoEnConsulta = false;
+        this.visorMazo?.cerrarVisor();
         this.ultimaFaseAplicada = fase;
 
         if (this.panelLobby) this.panelLobby.active = fase === "LOBBY";
         if (this.panelCombate) this.panelCombate.active = fase === "COMBAT";
         if (this.panelRecompensa) this.panelRecompensa.active = fase === "REWARD";
+        if (this.panelCofre) this.panelCofre.active = fase === "CHEST";
+        if (this.panelFogata) this.panelFogata.active = fase === "CAMPFIRE";
+        if (this.panelTienda) this.panelTienda.active = fase === "SHOP";
+
         if (this.panelMapa) {
             this.panelMapa.active = fase === "MAP" || this.mapaAbiertoEnConsulta;
         }
-        if (this.panelCofre) this.panelCofre.active = fase === "CHEST";
+
+        const enPartidaActiva =
+            fase === "MAP" ||
+            fase === "COMBAT" ||
+            fase === "REWARD" ||
+            fase === "CHEST" ||
+            fase === "CAMPFIRE" ||
+            fase === "SHOP";
+
         if (this.barraSuperiorReliquias) {
             this.barraSuperiorReliquias.active = fase !== "LOBBY";
         }
         if (this.btnToggleMapa) {
-            this.btnToggleMapa.active =
-                fase === "COMBAT" || fase === "REWARD" || fase === "CHEST";
+            this.btnToggleMapa.active = enPartidaActiva && fase !== "MAP";
+        }
+        if (this.btnToggleMazo) {
+            this.btnToggleMazo.active = enPartidaActiva;
         }
 
         const esFin = fase === "VICTORY" || fase === "DEFEAT";
@@ -110,6 +154,7 @@ export class UIManager extends Component {
         }
     }
 
+    // Asignar al Click Events de BtnToggleMapa y BtnCerrarConsulta del mapa
     public onClickToggleMapaConsulta() {
         const fase = NetworkManager.instance?.room?.state?.faseActual;
         if (fase === "MAP") return;
@@ -117,6 +162,16 @@ export class UIManager extends Component {
         this.mapaAbiertoEnConsulta = !this.mapaAbiertoEnConsulta;
         if (this.panelMapa) {
             this.panelMapa.active = this.mapaAbiertoEnConsulta;
+        }
+    }
+
+    // Asignar al Click Events del nuevo botón BtnToggleMazo (arriba a la derecha junto al mapa)
+    public onClickToggleMazoConsulta() {
+        if (!this.visorMazo) return;
+        if (this.visorMazo.node.active) {
+            this.visorMazo.cerrarVisor();
+        } else {
+            this.visorMazo.abrirModoConsulta();
         }
     }
 

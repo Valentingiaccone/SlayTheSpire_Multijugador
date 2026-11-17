@@ -1,6 +1,7 @@
 import { SpireState } from "../schema/SpireState";
 import { generarOpcionesRecompensa } from "../../../../assets/cliente/compartido/Cartas";
 import { obtenerReliquiasRecompensa } from "../../../../assets/cliente/compartido/Reliquias";
+import { ECONOMIA_CONFIG } from "../../../../assets/cliente/compartido/GameTypes";
 
 export class RewardService {
     constructor(
@@ -9,6 +10,12 @@ export class RewardService {
     ) {}
 
     public prepararRecompensas(): void {
+        const oroBase = this.state.esCombateJefe
+            ? ECONOMIA_CONFIG.ORO_COMBATE_JEFE
+            : this.state.esCombateElite
+            ? ECONOMIA_CONFIG.ORO_COMBATE_ELITE
+            : ECONOMIA_CONFIG.ORO_COMBATE_NORMAL;
+
         this.state.jugadores.forEach((jugador) => {
             if (jugador.hp <= 0) {
                 jugador.hp = Math.max(1, Math.floor(jugador.hpMax * 0.3));
@@ -16,6 +23,7 @@ export class RewardService {
             jugador.recompensaElegida = false;
             jugador.opcionesRecompensa.clear();
             jugador.reliquiaRecompensa = "";
+            jugador.oroRecompensa = oroBase;
 
             const opciones = generarOpcionesRecompensa(jugador.personajeId, 3);
             opciones.forEach((id) => jugador.opcionesRecompensa.push(id));
@@ -30,7 +38,8 @@ export class RewardService {
     public elegirRecompensa(
         sessionId: string,
         cartaId: string | null,
-        tomarReliquia: boolean = false
+        tomarReliquia: boolean = false,
+        tomarOro: boolean = false
     ): void {
         if (this.state.faseActual !== "REWARD") return;
         const jugador = this.state.jugadores.get(sessionId);
@@ -44,9 +53,14 @@ export class RewardService {
             jugador.reliquias.push(jugador.reliquiaRecompensa);
         }
 
+        if (tomarOro && jugador.oroRecompensa > 0) {
+            jugador.oro += jugador.oroRecompensa;
+        }
+
         jugador.recompensaElegida = true;
         jugador.opcionesRecompensa.clear();
         jugador.reliquiaRecompensa = "";
+        jugador.oroRecompensa = 0;
         this.verificarFinRecompensas();
     }
 

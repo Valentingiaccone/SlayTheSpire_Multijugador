@@ -9,6 +9,7 @@ import {
     IEstadoSalaCliente,
     IJugadorCliente,
     IEnemigoCliente,
+    IMapaEstadosCliente,
     EventoVisualCombate
 } from "../../compartido/GameTypes";
 import { CATALOGO_CARTAS } from "../../compartido/Cartas";
@@ -36,6 +37,7 @@ export class CombatController extends Component {
 
     private vistasEnemigos: Map<string, CombatEntityView> = new Map();
     private vistasAliados: Map<string, CombatEntityView> = new Map();
+    private datosEnemigosPorUid: Map<string, IEnemigoCliente> = new Map();
     private nodosCartas: Node[] = [];
     private secuenciador!: CombatSequencer;
 
@@ -80,21 +82,28 @@ export class CombatController extends Component {
                     : `Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
         }
 
+        const miId = NetworkManager.instance?.room?.sessionId;
+        const miJugador = miId ? state.jugadores.get(miId) : undefined;
         const animando = this.secuenciador.estaReproduciendo;
-        this.renderizarEnemigos(state.enemigos, animando);
+
+        this.renderizarEnemigos(state.enemigos, animando, miJugador?.estados);
         this.renderizarAliados(state.jugadores, animando);
     }
 
     private renderizarEnemigos(
         enemigos: IEstadoSalaCliente["enemigos"],
-        bloquearHpYBloqueo: boolean
+        bloquearHpYBloqueo: boolean,
+        estadosMiJugador?: IMapaEstadosCliente
     ) {
         if (!this.contenedorEnemigos || !this.templateEnemigo) return;
 
         const idsPresentes = new Set<string>();
+        this.datosEnemigosPorUid.clear();
 
         enemigos.forEach((enemigo: IEnemigoCliente) => {
             idsPresentes.add(enemigo.uid);
+            this.datosEnemigosPorUid.set(enemigo.uid, enemigo);
+
             let vista = this.vistasEnemigos.get(enemigo.uid);
 
             if (!vista) {
@@ -102,10 +111,9 @@ export class CombatController extends Component {
                 nodo.parent = this.contenedorEnemigos;
                 vista = nodo.getComponent(CombatEntityView) || nodo.addComponent(CombatEntityView);
                 this.vistasEnemigos.set(enemigo.uid, vista);
-                // Si el nodo recién se instancia al iniciar el combate, siempre mostramos su HP inicial
-                vista.sincronizarEnemigo(enemigo, false);
+                vista.sincronizarEnemigo(enemigo, false, estadosMiJugador);
             } else {
-                vista.sincronizarEnemigo(enemigo, bloquearHpYBloqueo);
+                vista.sincronizarEnemigo(enemigo, bloquearHpYBloqueo, estadosMiJugador);
             }
         });
 
@@ -189,7 +197,10 @@ export class CombatController extends Component {
                 data,
                 puedePagarse,
                 (indice, objetivoId) => NetworkManager.instance?.jugarCarta(indice, objetivoId),
-                (tipo, touchPos) => this.detectarObjetivoBajoCursor(tipo, touchPos)
+                (tipo, touchPos) => this.detectarObjetivoBajoCursor(tipo, touchPos),
+                miJugador.estados,
+                (objetivoId) => this.datosEnemigosPorUid.get(objetivoId)?.estados,
+                true
             );
         });
     }

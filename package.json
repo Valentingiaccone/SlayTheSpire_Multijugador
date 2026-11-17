@@ -1,10 +1,15 @@
 {
-  "name": "SlayTheSpire_Multijugador",
-  "uuid": "bd4814d8-eec9-4215-a9ab-58609415f36c",
-  "creator": {
-    "version": "3.8.3"
+  "main": "dist/server/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/server/src/index.js",
+    "dev": "nodemon --watch src --watch ../assets/cliente/compartido -e ts --exec \"tsc && node dist/server/src/index.js\""
   },
   "dependencies": {
     "colyseus.js": "^0.16.22"
-  }
+  },
+  "creator": {
+    "version": "3.8.3"
+  },
+  "uuid": "0de1351c-4fd7-4c59-b3d8-07e5a426efce"
 }

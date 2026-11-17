@@ -1,5 +1,6 @@
 import { SpireState, PlayerState, EnemyState } from "../rooms/schema/SpireState";
 import { EstadoId, FuenteDanio } from "../../../assets/cliente/compartido/CondicionesYEfectos";
+import { CalculadoraCombate } from "../../../assets/cliente/compartido/CalculadoraCombate";
 import { CONFIG_MAPA } from "../../../assets/cliente/compartido/Mapa";
 import { ActionQueue, IAccionCombate } from "./ActionQueue";
 import { CombatEventBus, EntidadCombate } from "./CombatEventBus";
@@ -8,9 +9,6 @@ export function obtenerIdEntidad(entidad: EntidadCombate): string {
     return entidad instanceof PlayerState ? entidad.sessionId : entidad.uid;
 }
 
-/**
- * Cálculo y aplicación de daño centralizados en un único lugar del servidor.
- */
 export class AccionAplicarDanio implements IAccionCombate {
     constructor(
         private atacante: EntidadCombate | undefined,
@@ -26,28 +24,18 @@ export class AccionAplicarDanio implements IAccionCombate {
             this.atacante &&
             this.atacante.hp <= 0
         ) {
-            // Evita el bug de "Enemigos Zombi": si el atacante murió por Espinas en el golpe previo, su siguiente golpe se cancela
             return;
         }
 
-        let monto = this.danioBase;
+        const monto =
+            this.fuente === "ATAQUE_CARTA" || this.fuente === "ATAQUE_ENEMIGO"
+                ? CalculadoraCombate.calcularDanioAtaque(
+                      this.danioBase,
+                      this.atacante?.estados,
+                      this.defensor.estados
+                  )
+                : Math.max(0, this.danioBase);
 
-        // Solo los ataques de cartas o enemigos escalan con FUERZA, DEBIL y VULNERABLE
-        if (this.fuente === "ATAQUE_CARTA" || this.fuente === "ATAQUE_ENEMIGO") {
-            if (this.atacante) {
-                monto += this.atacante.estados.get("FUERZA") || 0;
-                if ((this.atacante.estados.get("DEBIL") || 0) > 0) {
-                    monto = Math.floor(monto * 0.75);
-                }
-            }
-            if ((this.defensor.estados.get("VULNERABLE") || 0) > 0) {
-                monto = Math.floor(monto * 1.5);
-            }
-        }
-
-        monto = Math.max(0, monto);
-
-        // El veneno ignora bloqueo; el resto de fuentes impacta primero contra el bloqueo
         const ignoraBloqueo = this.fuente === "VENENO";
         const danioBloqueado = ignoraBloqueo ? 0 : Math.min(this.defensor.bloqueo, monto);
         const danioAlHp = Math.max(0, monto - danioBloqueado);
@@ -66,7 +54,6 @@ export class AccionAplicarDanio implements IAccionCombate {
             fuente: this.fuente
         });
 
-        // 1. Reacciones de ESPINAS y AL_RECIBIR_DANIO cuando un enemigo ataca a un jugador
         if (
             this.defensor instanceof PlayerState &&
             this.atacante instanceof EnemyState &&
@@ -91,7 +78,6 @@ export class AccionAplicarDanio implements IAccionCombate {
             }
         }
 
-        // 2. Reacciones AL_INFLIGIR_DANIO (solo en ataques de carta para no disparar bucles con reliquias)
         if (
             this.atacante instanceof PlayerState &&
             this.defensor instanceof EnemyState &&
@@ -109,7 +95,6 @@ export class AccionAplicarDanio implements IAccionCombate {
             });
         }
 
-        // 3. Si la entidad cayó a 0 HP, procesar su muerte inmediatamente al tope de la cola
         if (this.defensor.hp <= 0) {
             cola.encolarAlInicio(new AccionProcesarMuerte(this.defensor, this.atacante));
         }
@@ -249,7 +234,6 @@ export class AccionVerificarFinCombate implements IAccionCombate {
     ejecutar(state: SpireState, cola: ActionQueue, bus: CombatEventBus): void {
         if (state.faseActual !== "COMBAT") return;
 
-        // 1. ¿Quedan enemigos vivos?
         const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
         if (!quedaEnemigoVivo) {
             bus.emitir("AL_FINALIZAR_COMBATE", { state, cola });
@@ -257,7 +241,6 @@ export class AccionVerificarFinCombate implements IAccionCombate {
             return;
         }
 
-        // 2. ¿Quedan jugadores vivos? (Previene el soft-lock si todos mueren por veneno al iniciar turno)
         let quedaJugadorVivo = false;
         state.jugadores.forEach((j) => {
             if (j.hp > 0) quedaJugadorVivo = true;

@@ -2,7 +2,16 @@ import { EstadoId, FuenteDanio } from "./CondicionesYEfectos";
 import { EstadoNodoMapa, TipoNodoMapa } from "./Mapa";
 import { TipoIntencion } from "./Enemigos";
 
-export type FaseSala = "LOBBY" | "MAP" | "COMBAT" | "REWARD" | "CHEST" | "VICTORY" | "DEFEAT";
+export type FaseSala =
+    | "LOBBY"
+    | "MAP"
+    | "COMBAT"
+    | "REWARD"
+    | "CHEST"
+    | "CAMPFIRE"
+    | "SHOP"
+    | "VICTORY"
+    | "DEFEAT";
 
 export const MENSAJES = {
     ELEGIR_PERSONAJE: "elegir_personaje",
@@ -13,12 +22,31 @@ export const MENSAJES = {
     ELEGIR_RECOMPENSA: "elegir_recompensa",
     ABRIR_COFRE: "abrir_cofre",
     VOTAR_RELIQUIA_COFRE: "votar_reliquia_cofre",
+    ACCION_FOGATA: "accion_fogata",
+    COMPRAR_CARTA_TIENDA: "comprar_carta_tienda",
+    COMPRAR_RELIQUIA_TIENDA: "comprar_reliquia_tienda",
+    ELIMINAR_CARTA_TIENDA: "eliminar_carta_tienda",
+    SALIR_TIENDA: "salir_tienda",
     REINICIAR_PARTIDA: "reiniciar_partida",
-    SECUENCIA_COMBATE: "secuencia_combate" // Nuevo canal Servidor -> Cliente para animaciones paso a paso
+    SECUENCIA_COMBATE: "secuencia_combate"
 } as const;
 
+export const ECONOMIA_CONFIG = {
+    ORO_INICIAL: 100,
+    ORO_COMBATE_NORMAL: 25,
+    ORO_COMBATE_ELITE: 55,
+    ORO_COMBATE_JEFE: 100,
+    COSTO_ELIMINAR_CARTA_TIENDA: 75,
+    PORCENTAJE_CURACION_FOGATA: 0.3
+} as const;
+
+export type TipoAccionFogata =
+    | { tipo: "CURAR_PROPIO" }
+    | { tipo: "CURAR_ALIADO"; aliadoSessionId: string }
+    | { tipo: "MEJORAR_CARTA"; indiceMazo: number };
+
 export type PersonajeId = "SHELLY" | "CROW";
-export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow";
+export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow" | "maldicion";
 
 export interface IPersonajeInfo {
     id: PersonajeId;
@@ -26,6 +54,7 @@ export interface IPersonajeInfo {
     icono: string;
     hpMax: number;
     energiaMax: number;
+    oroInicial: number;
     descripcion: string;
     clases: ClaseId[];
     mazoInicial: string[];
@@ -39,6 +68,7 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
         icono: "icono_shelly",
         hpMax: 90,
         energiaMax: 3,
+        oroInicial: ECONOMIA_CONFIG.ORO_INICIAL,
         descripcion: "Personaje simple, tiene buen ataque, defensa y forma de ganar dinero.",
         clases: ["combate", "ladron", "shelly"],
         mazoInicial: [
@@ -54,6 +84,7 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
         icono: "icono_crow",
         hpMax: 70,
         energiaMax: 3,
+        oroInicial: ECONOMIA_CONFIG.ORO_INICIAL,
         descripcion: "Envenena a sus enemigos y lanza muchos ataques para acabar con sus enemigos.",
         clases: ["veneno", "asesino", "crow"],
         mazoInicial: [
@@ -65,7 +96,6 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
     }
 };
 
-// ================= EVENTOS VISUALES SECUENCIALES (SERVIDOR -> CLIENTE) =================
 export type EventoVisualCombate =
     | {
           tipo: "CARTA_JUGADA";
@@ -120,7 +150,6 @@ export type EventoVisualCombate =
           esEnemigo: boolean;
       };
 
-// ================= CONTRATOS TIPADOS DE ESTADO PARA EL CLIENTE (SIN 'any') =================
 export interface IMapaEstadosCliente {
     get(clave: EstadoId | string): number | undefined;
     forEach(cb: (valor: number, clave: string) => void): void;
@@ -136,17 +165,24 @@ export interface IJugadorCliente {
     bloqueo: number;
     energia: number;
     energiaMax: number;
+    oro: number;
+    oroRecompensa: number;
     turnoTerminado: boolean;
     nodoVotadoId: string;
     reliquiaCofreVotadaId: string;
     recompensaElegida: boolean;
     reliquiaRecompensa: string;
+    fogataCompletada: boolean;
+    tiendaCompletada: boolean;
+    tiendaEliminacionUsada: boolean;
     cantPilaRobo: number;
     cantDescarte: number;
     mano: Iterable<string> & { length: number; [index: number]: string };
-    mazoMaestro: Iterable<string> & { length: number };
-    opcionesRecompensa: Iterable<string> & { length: number };
-    reliquias: Iterable<string> & { length: number };
+    mazoMaestro: Iterable<string> & { length: number; [index: number]: string };
+    opcionesRecompensa: Iterable<string> & { length: number; [index: number]: string };
+    reliquias: Iterable<string> & { length: number; [index: number]: string };
+    tiendaCartas: Iterable<string> & { length: number; [index: number]: string };
+    tiendaReliquias: Iterable<string> & { length: number; [index: number]: string };
     estados: IMapaEstadosCliente;
 }
 

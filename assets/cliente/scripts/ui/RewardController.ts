@@ -18,6 +18,10 @@ export class RewardController extends Component {
     @property(Sprite) spriteReliquiaElite: Sprite = null!;
     @property(Label) labelReliquiaElite: Label = null!;
 
+    // Botón/Nodo seleccionable para agarrar o dejar el Oro de recompensa
+    @property(Node) contenedorOroRecompensa: Node = null!;
+    @property(Label) labelOroRecompensa: Label = null!;
+
     @property(Button) btnContinuar: Button = null!;
     @property(Label) labelBtnContinuar: Label = null!;
 
@@ -25,6 +29,7 @@ export class RewardController extends Component {
     private opcionesActuales: string[] = [];
     private cartaSeleccionadaId: string | null = null;
     private reliquiaSeleccionada: boolean = false;
+    private oroSeleccionado: boolean = false;
     private ultimoPisoInicializado: number = -1;
     private ultimaFirmaPropia: string = "";
 
@@ -33,11 +38,15 @@ export class RewardController extends Component {
         if (this.contenedorReliquiaElite) {
             this.contenedorReliquiaElite.on(Button.EventType.CLICK, this.onToggleReliquiaElite, this);
         }
+        if (this.contenedorOroRecompensa) {
+            this.contenedorOroRecompensa.on(Button.EventType.CLICK, this.onToggleOroRecompensa, this);
+        }
     }
 
     onEnable() {
         this.cartaSeleccionadaId = null;
         this.reliquiaSeleccionada = false;
+        this.oroSeleccionado = false;
         this.ultimaFirmaPropia = "";
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
         if (NetworkManager.instance?.room?.state) {
@@ -60,11 +69,12 @@ export class RewardController extends Component {
             this.ultimoPisoInicializado = state.pisoActual;
             this.cartaSeleccionadaId = null;
             this.reliquiaSeleccionada = false;
+            this.oroSeleccionado = false;
             this.ultimaFirmaPropia = "";
         }
 
         const opciones = Array.from(miJugador.opcionesRecompensa || []);
-        const firmaActual = `${miJugador.recompensaElegida}|${opciones.join(",")}|${miJugador.reliquiaRecompensa}`;
+        const firmaActual = `${miJugador.recompensaElegida}|${opciones.join(",")}|${miJugador.reliquiaRecompensa}|${miJugador.oroRecompensa}`;
         if (firmaActual === this.ultimaFirmaPropia) return;
         this.ultimaFirmaPropia = firmaActual;
 
@@ -74,6 +84,7 @@ export class RewardController extends Component {
             }
             this.nodosOpciones.forEach((n) => (n.active = false));
             if (this.contenedorReliquiaElite) this.contenedorReliquiaElite.active = false;
+            if (this.contenedorOroRecompensa) this.contenedorOroRecompensa.active = false;
             if (this.btnContinuar) this.btnContinuar.node.active = false;
             return;
         }
@@ -86,6 +97,7 @@ export class RewardController extends Component {
         this.opcionesActuales = opciones;
         this.renderizarCartas(this.opcionesActuales);
         this.renderizarReliquiaElite(miJugador.reliquiaRecompensa);
+        this.renderizarOroRecompensa(miJugador.oroRecompensa);
         this.actualizarTextoBotonContinuar();
     }
 
@@ -124,10 +136,7 @@ export class RewardController extends Component {
             nodo.active = true;
             const estaSeleccionada = this.cartaSeleccionadaId === cartaId;
             const cardView = nodo.getComponent(CardView);
-            cardView?.configurar(i, data, true, () => {}, () => undefined);
-
-            const escala = estaSeleccionada ? 1.12 : 0.95;
-            nodo.setScale(escala, escala, 1);
+            cardView?.configurarModoEstatico(data, estaSeleccionada ? 1.12 : 0.95);
         });
     }
 
@@ -154,7 +163,25 @@ export class RewardController extends Component {
         }
     }
 
-    private onToggleReliquiaElite() {
+    private renderizarOroRecompensa(oroDisponible: number) {
+        if (!this.contenedorOroRecompensa) return;
+
+        if (!oroDisponible || oroDisponible <= 0) {
+            this.contenedorOroRecompensa.active = false;
+            return;
+        }
+
+        this.contenedorOroRecompensa.active = true;
+        if (this.labelOroRecompensa) {
+            const tag = this.oroSeleccionado ? "✅ [SELECCIONADO]" : "[Clic para seleccionar]";
+            this.labelOroRecompensa.string = `💰 +${oroDisponible} de Oro ${tag}`;
+            this.labelOroRecompensa.color = this.oroSeleccionado
+                ? new Color(130, 255, 150)
+                : new Color(255, 230, 110);
+        }
+    }
+
+    public onToggleReliquiaElite() {
         this.reliquiaSeleccionada = !this.reliquiaSeleccionada;
         const miId = NetworkManager.instance?.room?.sessionId;
         const miJugador = miId ? NetworkManager.instance?.room?.state.jugadores.get(miId) : undefined;
@@ -164,14 +191,31 @@ export class RewardController extends Component {
         }
     }
 
+    public onToggleOroRecompensa() {
+        this.oroSeleccionado = !this.oroSeleccionado;
+        const miId = NetworkManager.instance?.room?.sessionId;
+        const miJugador = miId ? NetworkManager.instance?.room?.state.jugadores.get(miId) : undefined;
+        if (miJugador) {
+            this.renderizarOroRecompensa(miJugador.oroRecompensa);
+            this.actualizarTextoBotonContinuar();
+        }
+    }
+
     private actualizarTextoBotonContinuar() {
         if (!this.labelBtnContinuar) return;
-        const cantidad = (this.cartaSeleccionadaId ? 1 : 0) + (this.reliquiaSeleccionada ? 1 : 0);
+        const cantidad =
+            (this.cartaSeleccionadaId ? 1 : 0) +
+            (this.reliquiaSeleccionada ? 1 : 0) +
+            (this.oroSeleccionado ? 1 : 0);
         this.labelBtnContinuar.string =
             cantidad > 0 ? `Continuar (${cantidad} seleccionada/s)` : "Continuar (Saltar todo)";
     }
 
     public onClickContinuar() {
-        NetworkManager.instance?.elegirRecompensa(this.cartaSeleccionadaId, this.reliquiaSeleccionada);
+        NetworkManager.instance?.elegirRecompensa(
+            this.cartaSeleccionadaId,
+            this.reliquiaSeleccionada,
+            this.oroSeleccionado
+        );
     }
 }

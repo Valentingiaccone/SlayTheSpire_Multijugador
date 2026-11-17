@@ -14,6 +14,7 @@ const { ccclass, property } = _decorator;
 @ccclass("RelicTopBarController")
 export class RelicTopBarController extends Component {
     @property(Node) contenedorIconos: Node = null!;
+    @property(Label) labelOro: Label = null!;
 
     @property(Node) panelDetalle: Node = null!;
     @property(Sprite) spriteDetalle: Sprite = null!;
@@ -45,12 +46,17 @@ export class RelicTopBarController extends Component {
     private onEstadoCambiado(state: IEstadoSalaCliente) {
         const miId = NetworkManager.instance?.room?.sessionId;
         const miJugador = miId ? state.jugadores.get(miId) : undefined;
-        if (!miJugador || !this.contenedorIconos) return;
+        if (!miJugador) return;
+
+        if (this.labelOro) {
+            this.labelOro.string = `💰 ${miJugador.oro}`;
+        }
+
+        if (!this.contenedorIconos) return;
 
         const misReliquias: string[] = Array.from(miJugador.reliquias || []);
         const firma = misReliquias.join(",");
 
-        // Evita recargar sprites en cada cambio de HP o carta jugada si las reliquias no cambiaron
         if (firma === this.ultimaFirmaReliquias) return;
         this.ultimaFirmaReliquias = firma;
         this.reliquiasActuales = misReliquias;
