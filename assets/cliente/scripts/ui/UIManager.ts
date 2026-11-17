@@ -1,6 +1,11 @@
 import { _decorator, Component, Node, Label } from "cc";
-import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
-import { FaseSala } from "../../compartido/GameTypes";
+import {
+    NetworkManager,
+    NetworkEvents,
+    EVENTO_ESTADO_ACTUALIZADO,
+    EVENTO_SECUENCIA_COMBATE
+} from "../network/NetworkManager";
+import { FaseSala, IEstadoSalaCliente, EventoVisualCombate } from "../../compartido/GameTypes";
 
 const { ccclass, property } = _decorator;
 
@@ -14,15 +19,16 @@ export class UIManager extends Component {
     @property(Label) labelFinPartida: Label = null!;
     @property(Node) panelCofre: Node = null!;
     @property(Node) barraSuperiorReliquias: Node = null!;
-
-    // Botón flotante arriba a la derecha para abrir/cerrar el mapa en cualquier momento
     @property(Node) btnToggleMapa: Node = null!;
 
     private mapaAbiertoEnConsulta: boolean = false;
-    private ultimaFase: FaseSala | "" = "";
+    private ultimaFaseAplicada: FaseSala | "" = "";
+    private timestampFinSecuenciaEstimado: number = 0;
+    private timerTransicionFase: ReturnType<typeof setTimeout> | null = null;
 
     onLoad() {
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoActualizado, this);
+        NetworkEvents.on(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
     }
 
     async start() {
@@ -32,47 +38,81 @@ export class UIManager extends Component {
 
     onDestroy() {
         NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoActualizado, this);
+        NetworkEvents.off(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
+        if (this.timerTransicionFase) {
+            clearTimeout(this.timerTransicionFase);
+        }
     }
 
-    private onEstadoActualizado(state: any) {
+    private onSecuenciaRecibida(eventos: EventoVisualCombate[]) {
+        if (!eventos || eventos.length === 0) return;
+        // Estimamos ~220ms por evento visual para no cortar el golpe final antes de mostrar Recompensas
+        const duracionMs = Math.min(2500, eventos.length * 220 + 250);
+        this.timestampFinSecuenciaEstimado = Math.max(
+            this.timestampFinSecuenciaEstimado,
+            Date.now() + duracionMs
+        );
+    }
+
+    private onEstadoActualizado(state: IEstadoSalaCliente) {
         const fase: FaseSala = state.faseActual;
+        if (fase === this.ultimaFaseAplicada) return;
 
-        // Si cambió la fase de la sala, cerramos el modo consulta manual
-        if (fase !== this.ultimaFase) {
-            this.mapaAbiertoEnConsulta = false;
-            this.ultimaFase = fase;
+        const saliendoDeCombate =
+            this.ultimaFaseAplicada === "COMBAT" &&
+            (fase === "REWARD" || fase === "VICTORY" || fase === "DEFEAT");
+
+        const esperaRestante = this.timestampFinSecuenciaEstimado - Date.now();
+
+        if (saliendoDeCombate && esperaRestante > 50) {
+            if (this.timerTransicionFase) clearTimeout(this.timerTransicionFase);
+            this.timerTransicionFase = setTimeout(() => {
+                this.timerTransicionFase = null;
+                this.aplicarCambioDeFase(fase);
+            }, esperaRestante);
+            return;
         }
 
-        if (this.panelLobby) this.panelLobby.active = (fase === "LOBBY");
-        if (this.panelCombate) this.panelCombate.active = (fase === "COMBAT");
-        if (this.panelRecompensa) this.panelRecompensa.active = (fase === "REWARD");
+        this.aplicarCambioDeFase(fase);
+    }
 
-        // El mapa está visible siempre en fase MAP, o cuando el jugador lo abre en modo consulta
+    private aplicarCambioDeFase(fase: FaseSala) {
+        if (this.timerTransicionFase) {
+            clearTimeout(this.timerTransicionFase);
+            this.timerTransicionFase = null;
+        }
+
+        this.mapaAbiertoEnConsulta = false;
+        this.ultimaFaseAplicada = fase;
+
+        if (this.panelLobby) this.panelLobby.active = fase === "LOBBY";
+        if (this.panelCombate) this.panelCombate.active = fase === "COMBAT";
+        if (this.panelRecompensa) this.panelRecompensa.active = fase === "REWARD";
         if (this.panelMapa) {
-            this.panelMapa.active = (fase === "MAP") || this.mapaAbiertoEnConsulta;
+            this.panelMapa.active = fase === "MAP" || this.mapaAbiertoEnConsulta;
         }
-
-        if (this.panelCofre) this.panelCofre.active = (fase === "CHEST");
+        if (this.panelCofre) this.panelCofre.active = fase === "CHEST";
         if (this.barraSuperiorReliquias) {
-            this.barraSuperiorReliquias.active = (fase !== "LOBBY");
+            this.barraSuperiorReliquias.active = fase !== "LOBBY";
         }
         if (this.btnToggleMapa) {
-            this.btnToggleMapa.active = (fase === "COMBAT" || fase === "REWARD" || fase === "CHEST");
+            this.btnToggleMapa.active =
+                fase === "COMBAT" || fase === "REWARD" || fase === "CHEST";
         }
 
         const esFin = fase === "VICTORY" || fase === "DEFEAT";
         if (this.panelFinPartida) this.panelFinPartida.active = esFin;
         if (esFin && this.labelFinPartida) {
-            this.labelFinPartida.string = fase === "VICTORY"
-                ? "¡VICTORIA! Derrotaron al Jefe Final"
-                : "DERROTA — Todos los jugadores cayeron";
+            this.labelFinPartida.string =
+                fase === "VICTORY"
+                    ? "¡VICTORIA! Derrotaron al Jefe Final"
+                    : "DERROTA — Todos los jugadores cayeron";
         }
     }
 
-    // Asignar al Click Events de BtnToggleMapa y también al BtnCerrarConsulta del PanelMapa
     public onClickToggleMapaConsulta() {
         const fase = NetworkManager.instance?.room?.state?.faseActual;
-        if (fase === "MAP") return; // En fase MAP es obligatorio votar, no se cierra
+        if (fase === "MAP") return;
 
         this.mapaAbiertoEnConsulta = !this.mapaAbiertoEnConsulta;
         if (this.panelMapa) {

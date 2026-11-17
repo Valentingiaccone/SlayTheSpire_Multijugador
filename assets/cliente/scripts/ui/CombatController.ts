@@ -1,7 +1,20 @@
-import { _decorator, Component, Node, Label, Button, Color, instantiate, UITransform, Vec2, Vec3, Prefab } from "cc";
-import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
+import { _decorator, Component, Node, Label, Button, instantiate, Vec3, Prefab } from "cc";
+import {
+    NetworkManager,
+    NetworkEvents,
+    EVENTO_ESTADO_ACTUALIZADO,
+    EVENTO_SECUENCIA_COMBATE
+} from "../network/NetworkManager";
+import {
+    IEstadoSalaCliente,
+    IJugadorCliente,
+    IEnemigoCliente,
+    EventoVisualCombate
+} from "../../compartido/GameTypes";
 import { CATALOGO_CARTAS } from "../../compartido/Cartas";
 import { CardView } from "./CardView";
+import { CombatEntityView } from "./CombatEntityView";
+import { CombatSequencer } from "./CombatSequencer";
 
 const { ccclass, property } = _decorator;
 
@@ -16,26 +29,32 @@ export class CombatController extends Component {
     @property(Node) templateAliado: Node = null!;
 
     @property(Node) contenedorMano: Node = null!;
-    @property(Prefab) templateCarta: Prefab = null
+    @property(Prefab) templateCarta: Prefab = null!;
 
     @property(Button) btnTerminarTurno: Button = null!;
     @property(Label) labelBtnTerminarTurno: Label = null!;
 
-    private nodosEnemigos: Node[] = [];
-    private nodosAliados: Node[] = [];
+    private vistasEnemigos: Map<string, CombatEntityView> = new Map();
+    private vistasAliados: Map<string, CombatEntityView> = new Map();
     private nodosCartas: Node[] = [];
-
-    // Tablas paralelas para saber qué ID de servidor tiene cada nodo visual
-    private uidsEnemigosPorNodo: string[] = [];
-    private idsAliadosPorNodo: string[] = [];
+    private secuenciador!: CombatSequencer;
 
     onLoad() {
         if (this.templateEnemigo) this.templateEnemigo.active = false;
         if (this.templateAliado) this.templateAliado.active = false;
+
+        this.secuenciador = new CombatSequencer(
+            (id) => this.vistasEnemigos.get(id) || this.vistasAliados.get(id),
+            () => {
+                const state = NetworkManager.instance?.room?.state;
+                if (state) this.onEstadoCambiado(state);
+            }
+        );
     }
 
     onEnable() {
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
+        NetworkEvents.on(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
         if (NetworkManager.instance?.room?.state) {
             this.onEstadoCambiado(NetworkManager.instance.room.state);
         }
@@ -43,123 +62,119 @@ export class CombatController extends Component {
 
     onDisable() {
         NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
+        NetworkEvents.off(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
+        this.secuenciador?.limpiar();
     }
 
-    private onEstadoCambiado(state: any) {
+    private onSecuenciaRecibida(eventos: EventoVisualCombate[]) {
+        this.secuenciador.encolarLote(eventos);
+    }
+
+    private onEstadoCambiado(state: IEstadoSalaCliente) {
         if (state.faseActual !== "COMBAT" && state.faseActual !== "DEFEAT") return;
 
         if (this.labelTurno) {
-            this.labelTurno.string = state.faseActual === "DEFEAT"
-                ? "¡DERROTA! Todos cayeron"
-                : `Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
+            this.labelTurno.string =
+                state.faseActual === "DEFEAT"
+                    ? "¡DERROTA! Todos cayeron"
+                    : `Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
         }
 
-        this.renderizarEnemigos(state.enemigos);
-        this.renderizarAliados(state.jugadores);
+        const animando = this.secuenciador.estaReproduciendo;
+        this.renderizarEnemigos(state.enemigos, animando);
+        this.renderizarAliados(state.jugadores, animando);
     }
 
-    private renderizarEnemigos(enemigos: any) {
+    private renderizarEnemigos(
+        enemigos: IEstadoSalaCliente["enemigos"],
+        bloquearHpYBloqueo: boolean
+    ) {
         if (!this.contenedorEnemigos || !this.templateEnemigo) return;
 
-        while (this.nodosEnemigos.length < enemigos.length) {
-            const nodo = instantiate(this.templateEnemigo);
-            nodo.parent = this.contenedorEnemigos;
-            this.nodosEnemigos.push(nodo);
-        }
+        const idsPresentes = new Set<string>();
 
-        this.nodosEnemigos.forEach((nodo, i) => {
-            if (i >= enemigos.length) {
-                nodo.active = false;
-                return;
+        enemigos.forEach((enemigo: IEnemigoCliente) => {
+            idsPresentes.add(enemigo.uid);
+            let vista = this.vistasEnemigos.get(enemigo.uid);
+
+            if (!vista) {
+                const nodo = instantiate(this.templateEnemigo);
+                nodo.parent = this.contenedorEnemigos;
+                vista = nodo.getComponent(CombatEntityView) || nodo.addComponent(CombatEntityView);
+                this.vistasEnemigos.set(enemigo.uid, vista);
+                // Si el nodo recién se instancia al iniciar el combate, siempre mostramos su HP inicial
+                vista.sincronizarEnemigo(enemigo, false);
+            } else {
+                vista.sincronizarEnemigo(enemigo, bloquearHpYBloqueo);
             }
-            const enemigo = enemigos[i];
-            // Guardamos el UID de este enemigo en la misma posición i que su nodo visual
-            this.uidsEnemigosPorNodo[i] = enemigo.uid;
+        });
 
-            // Si el enemigo ya murió, lo ocultamos
-            if (enemigo.hp <= 0) {
-                nodo.active = false;
-                return;
-            }
-
-            nodo.active = true;
-            const label = nodo.getComponent(Label);
-            if (label) {
-                const intencionTxt = enemigo.intencionTipo === "ATACAR"
-                    ? `⚔️ Ataca por ${enemigo.intencionValor} (a TODOS)`
-                    : `🛡️ Se cubrirá +${enemigo.intencionValor}`;
-                const bloqueoTxt = enemigo.bloqueo > 0 ? ` (+${enemigo.bloqueo} 🛡️)` : "";
-                const estadosTxt = this.formatearEstados(enemigo.estados);
-
-                label.string = `${enemigo.nombre}${estadosTxt}\nHP: ${enemigo.hp}/${enemigo.hpMax}${bloqueoTxt}\n${intencionTxt}`;
+        this.vistasEnemigos.forEach((vista, uid) => {
+            if (!idsPresentes.has(uid)) {
+                vista.node.active = false;
             }
         });
     }
 
-    private renderizarAliados(jugadores: any) {
+    private renderizarAliados(
+        jugadores: IEstadoSalaCliente["jugadores"],
+        bloquearHpYBloqueo: boolean
+    ) {
         if (!this.contenedorAliados || !this.templateAliado) return;
 
-        const listaJugadores: any[] = [];
-        jugadores.forEach((j: any) => listaJugadores.push(j));
-
-        while (this.nodosAliados.length < listaJugadores.length) {
-            const nodo = instantiate(this.templateAliado);
-            nodo.parent = this.contenedorAliados;
-            this.nodosAliados.push(nodo);
-        }
-
         const miId = NetworkManager.instance?.room?.sessionId;
+        const idsPresentes = new Set<string>();
 
-        this.nodosAliados.forEach((nodo, i) => {
-            if (i >= listaJugadores.length) {
-                nodo.active = false;
-                return;
-            }
-            const j = listaJugadores[i];
-            // Guardamos el sessionId de este aliado en la misma posición i que su nodo visual
-            this.idsAliadosPorNodo[i] = j.sessionId;
-            nodo.active = true;
-
+        jugadores.forEach((j: IJugadorCliente) => {
+            idsPresentes.add(j.sessionId);
             const esYo = j.sessionId === miId;
-            const label = nodo.getComponent(Label);
-            if (label) {
-                const tagYo = esYo ? " (Vos)" : "";
-                const estadoTurno = j.hp <= 0 ? "[CAÍDO]" : (j.turnoTerminado ? "[Turno Listo]" : "[Jugando]");
-                const estadosTxt = this.formatearEstados(j.estados);
+            let vista = this.vistasAliados.get(j.sessionId);
 
-                label.string = `${j.nombre}${tagYo}${estadosTxt} | HP: ${j.hp}/${j.hpMax} | 🛡️ ${j.bloqueo} | ⚡ ${j.energia}/${j.energiaMax} ${estadoTurno}`;
-                label.color = j.turnoTerminado ? new Color(150, 255, 150) : new Color(255, 255, 255);
+            if (!vista) {
+                const nodo = instantiate(this.templateAliado);
+                nodo.parent = this.contenedorAliados;
+                vista = nodo.getComponent(CombatEntityView) || nodo.addComponent(CombatEntityView);
+                this.vistasAliados.set(j.sessionId, vista);
+                vista.sincronizarAliado(j, esYo, false);
+            } else {
+                vista.sincronizarAliado(j, esYo, bloquearHpYBloqueo);
             }
 
             if (esYo) {
                 if (this.btnTerminarTurno && this.labelBtnTerminarTurno) {
                     this.btnTerminarTurno.interactable = !j.turnoTerminado && j.hp > 0;
-                    this.labelBtnTerminarTurno.string = j.turnoTerminado ? "Esperando aliados..." : "Terminar Turno";
+                    this.labelBtnTerminarTurno.string = j.turnoTerminado
+                        ? "Esperando aliados..."
+                        : "Terminar Turno";
                 }
-                // Dibujamos nuestra mano de cartas
                 this.renderizarMano(j);
+            }
+        });
+
+        this.vistasAliados.forEach((vista, sessionId) => {
+            if (!idsPresentes.has(sessionId)) {
+                vista.node.active = false;
             }
         });
     }
 
-    private renderizarMano(miJugador: any) {
+    private renderizarMano(miJugador: IJugadorCliente) {
         if (!this.contenedorMano || !this.templateCarta) return;
 
         while (this.nodosCartas.length < miJugador.mano.length) {
             const nodo = instantiate(this.templateCarta);
-            this.contenedorMano.addChild(nodo)
+            this.contenedorMano.addChild(nodo);
             this.nodosCartas.push(nodo);
         }
 
         this.nodosCartas.forEach((nodo, i) => {
             if (i >= miJugador.mano.length) {
-                nodo.active = false
-                return
+                nodo.active = false;
+                return;
             }
 
             const cartaId: string = miJugador.mano[i];
             const data = CATALOGO_CARTAS[cartaId];
-            console.log(CATALOGO_CARTAS)
             if (!data) {
                 nodo.active = false;
                 return;
@@ -180,41 +195,16 @@ export class CombatController extends Component {
     }
 
     private detectarObjetivoBajoCursor(tipo: "ENEMIGO" | "ALIADO", touchPos: Vec3): string | undefined {
-        const listaNodos = tipo === "ENEMIGO" ? this.nodosEnemigos : this.nodosAliados;
-        const listaIds = tipo === "ENEMIGO" ? this.uidsEnemigosPorNodo : this.idsAliadosPorNodo;
+        const mapaVistas = tipo === "ENEMIGO" ? this.vistasEnemigos : this.vistasAliados;
 
-        for (let i = 0; i < listaNodos.length; i++) {
-            const nodo = listaNodos[i];
-            if (!nodo.active) continue;
-            const uiTrans = nodo.getComponent(UITransform);
-            if (uiTrans && uiTrans.getBoundingBoxToWorld().contains(new Vec2(touchPos.x, touchPos.y))) {
-                return listaIds[i];
+        for (const [id, vista] of mapaVistas.entries()) {
+            if (vista.contienePuntoMundo(touchPos)) {
+                return id;
             }
         }
         return undefined;
     }
 
-    private formatearEstados(estados: any): string {
-        if (!estados) return "";
-        const leer = (clave: string) => typeof estados.get === "function" ? (estados.get(clave) || 0) : (estados[clave] || 0);
-
-        const lista: string[] = [];
-        const fuerza = leer("FUERZA");
-        const vuln = leer("VULNERABLE");
-        const debil = leer("DEBIL");
-        const espinas = leer("ESPINAS");
-        const veneno = leer("VENENO");
-
-        if (fuerza !== 0) lista.push(`💪${fuerza > 0 ? "+" : ""}${fuerza}`);
-        if (vuln > 0) lista.push(`💔Vuln(${vuln})`);
-        if (debil > 0) lista.push(`📉Débil(${debil})`);
-        if (espinas > 0) lista.push(`🌵Espinas(${espinas})`);
-        if (veneno > 0) lista.push(`☠️Veneno(${veneno})`);
-
-        return lista.length > 0 ? ` [${lista.join(" ")}]` : "";
-    }
-
-    // Asignar al Click Events del botón BtnTerminarTurno
     public onClickTerminarTurno() {
         NetworkManager.instance?.terminarTurno();
     }

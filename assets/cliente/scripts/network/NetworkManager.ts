@@ -1,18 +1,24 @@
 import { _decorator, Component, EventTarget } from "cc";
 import type { Client, Room } from "colyseus.js";
-import { MENSAJES, PersonajeId } from "../../compartido/GameTypes";
+import {
+    MENSAJES,
+    PersonajeId,
+    IEstadoSalaCliente,
+    EventoVisualCombate
+} from "../../compartido/GameTypes";
 
 const { ccclass } = _decorator;
 
 export const NetworkEvents = new EventTarget();
 export const EVENTO_ESTADO_ACTUALIZADO = "estado_actualizado";
+export const EVENTO_SECUENCIA_COMBATE = "secuencia_combate";
 
 @ccclass("NetworkManager")
 export class NetworkManager extends Component {
     public static instance: NetworkManager | null = null;
 
     private client: Client | null = null;
-    public room: Room<any> | null = null;
+    public room: Room<IEstadoSalaCliente> | null = null;
 
     onLoad() {
         if (NetworkManager.instance) {
@@ -24,14 +30,20 @@ export class NetworkManager extends Component {
 
     public async conectarYSala(nombreJugador: string) {
         try {
-            const Colyseus = (window as any).Colyseus;
-           // this.client = new Colyseus.Client("ws://localhost:2567");
-            this.client = new Colyseus.Client("https://slaythespire-multijugador.onrender.com")
-            this.room = await this.client!.joinOrCreate("spire_room", { nombre: nombreJugador });
-            console.log("Conectado a la sala:", this.room!.roomId, "Mi ID:", this.room!.sessionId);
+            const ColyseusLib = (window as unknown as { Colyseus: { Client: new (url: string) => Client } }).Colyseus;
+            // this.client = new ColyseusLib.Client("ws://localhost:2567");
+            this.client = new ColyseusLib.Client("https://slaythespire-multijugador.onrender.com");
+            this.room = await this.client.joinOrCreate<IEstadoSalaCliente>("spire_room", {
+                nombre: nombreJugador
+            });
+            console.log("Conectado a la sala:", this.room.roomId, "Mi ID:", this.room.sessionId);
 
-            this.room!.onStateChange((state) => {
+            this.room.onStateChange((state) => {
                 NetworkEvents.emit(EVENTO_ESTADO_ACTUALIZADO, state);
+            });
+
+            this.room.onMessage(MENSAJES.SECUENCIA_COMBATE, (eventos: EventoVisualCombate[]) => {
+                NetworkEvents.emit(EVENTO_SECUENCIA_COMBATE, eventos);
             });
         } catch (e) {
             console.error("Error al conectar con Colyseus:", e);
