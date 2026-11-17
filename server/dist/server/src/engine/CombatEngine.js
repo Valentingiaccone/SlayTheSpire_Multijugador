@@ -32,7 +32,8 @@ const EFECTO_HANDLERS = {
     GANAR_ENERGIA: (_state, lanzador, efecto) => {
         lanzador.energia += efecto.valor;
     }
-};
+}
+
 function resolverObjetivos(state, lanzador, tipo, objetivoId) {
     switch (tipo) {
         case "PROPIO":
@@ -57,6 +58,7 @@ function resolverObjetivos(state, lanzador, tipo, objetivoId) {
             return [];
     }
 }
+
 class CombatEngine {
     /** Embudo único para jugar cualquier carta */
     static jugarCarta(state, jugador, indiceMano, objetivoId) {

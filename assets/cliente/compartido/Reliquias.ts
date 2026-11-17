@@ -1,5 +1,5 @@
 import { ClaseId, PERSONAJES_INFO, PersonajeId } from "./GameTypes";
-import { IEfecto, ICartaData } from "./Cartas";
+import { DescriptorCondicion, DescriptorEfecto } from "./CondicionesYEfectos";
 
 export type TriggerReliquia =
     | "AL_INICIAR_COMBATE"
@@ -8,31 +8,8 @@ export type TriggerReliquia =
     | "AL_TERMINAR_TURNO"
     | "AL_RECIBIR_DANIO"
     | "AL_INFLIGIR_DANIO"
-    | "AL_FINALIZAR_COMBATE"
-
-/**
- * Contexto rico que reciben TODAS las reliquias aunque no usen todos los parámetros.
- * Si mañana inventás una reliquia con una condición nueva, ya tenés los datos acá.
- */
-export interface IReliquiaContexto {
-    state: any;
-    portador: any; // PlayerState dueño de la reliquia
-    turnoNumero: number;
-    pisoActual: number;
-    esElite: boolean;
-    esJefe: boolean;
-    // Datos al jugar carta
-    cartaJugada?: ICartaData;
-    objetivoId?: string;
-    cartasJugadasTurno: number;
-    ataquesJugadosTurno: number;
-    cartasJugadasCombate: number;
-    // Datos al recibir daño
-    danioRecibido?: number;
-    atacante?: any;
-    // Datos al infligir daño?
-    danioInfligido?: number;
-}
+    | "AL_MORIR_ENEMIGO"
+    | "AL_FINALIZAR_COMBATE";
 
 export interface IReliquiaData {
     id: string;
@@ -40,10 +17,10 @@ export interface IReliquiaData {
     descripcion: string;
     icono: string;
     clase: ClaseId | "neutral";
-    enPoolRecompensa: boolean; // false = reliquia inicial (no sale en cofres ni élites)
+    enPoolRecompensa: boolean;
     trigger: TriggerReliquia;
-    condicion?: (ctx: IReliquiaContexto) => boolean;
-    efectos: IEfecto[];
+    condicion?: DescriptorCondicion;
+    efectos: DescriptorEfecto[];
 }
 
 export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
@@ -61,7 +38,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
     cocoroch: {
         id: "cocoroch",
         nombre: "Cocoroch",
-        descripcion: "Cada vez que inflijas daño a un enemigo, le aplica 1 de Veneno.",
+        descripcion: "Cada vez que inflijas daño de ataque a un enemigo, le aplica 1 de Veneno.",
         icono: "reliquia_cocoroch",
         clase: "crow",
         enPoolRecompensa: false,
@@ -78,8 +55,8 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "asesino",
         enPoolRecompensa: true,
         trigger: "AL_JUGAR_CARTA",
-        condicion: (ctx) => ctx.cartasJugadasTurno > 0 && ctx.cartasJugadasTurno % 3 === 0,
-        efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS" }]
+        condicion: { tipo: "CARTAS_TURNO_MULTIPLO", divisor: 3 },
+        efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS", fuente: "RELIQUIA" }]
     },
 
     // ================= RELIQUIAS DE COMBATE ===============
@@ -91,7 +68,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "combate",
         enPoolRecompensa: true,
         trigger: "AL_RECIBIR_DANIO",
-        condicion: (ctx) => (ctx.danioRecibido || 0) > 0,
+        condicion: { tipo: "DANIO_RECIBIDO_MAYOR_A", minimo: 0 },
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "PROPIO", estadoId: "FUERZA" }]
     },
 
@@ -124,7 +101,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_TERMINAR_TURNO",
-        condicion: (ctx) => ctx.ataquesJugadosTurno === 0,
+        condicion: { tipo: "ATAQUES_TURNO_IGUAL", cantidad: 0 },
         efectos: [{ tipo: "APLICAR_ESTADO", valor: 2, objetivo: "PROPIO", estadoId: "FUERZA" }]
     },
     pala: {
@@ -155,7 +132,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
-        condicion: (ctx) => ctx.turnoNumero % 3 === 0,
+        condicion: { tipo: "TURNO_MULTIPLO", divisor: 3 },
         efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
     },
     spooky: {
@@ -166,7 +143,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
-        condicion: (ctx) => ctx.turnoNumero === 2,
+        condicion: { tipo: "TURNO_EXACTO", turno: 2 },
         efectos: [{ tipo: "BLOQUEO", valor: 8, objetivo: "TODOS_ALIADOS" }]
     },
     oso_en_punto: {
@@ -177,12 +154,12 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
-        condicion: (ctx) => ctx.turnoNumero === 8,
-        efectos: [{ tipo: "DANIO", valor: 50, objetivo: "TODOS_ENEMIGOS" }]
+        condicion: { tipo: "TURNO_EXACTO", turno: 8 },
+        efectos: [{ tipo: "DANIO", valor: 50, objetivo: "TODOS_ENEMIGOS", fuente: "RELIQUIA" }]
     },
     sanacion: {
         id: "sanacion",
-        nombre: "Sanacion",
+        nombre: "Sanación",
         descripcion: "Al iniciar un combate, cura 2 de HP.",
         icono: "reliquia_sanacion",
         clase: "neutral",
@@ -193,7 +170,7 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
     elixir: {
         id: "elixir",
         nombre: "Elixir",
-        descripcion: "Al iniciar un combate, gana 1 de energia.",
+        descripcion: "Al iniciar un combate, gana 1 de energía.",
         icono: "reliquia_elixir",
         clase: "neutral",
         enPoolRecompensa: true,
@@ -208,17 +185,19 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         clase: "neutral",
         enPoolRecompensa: true,
         trigger: "AL_INICIAR_TURNO",
-        condicion: (ctx) => ctx.turnoNumero % 2 === 0,
+        condicion: { tipo: "TURNO_PARIDAD", esPar: true },
         efectos: [{ tipo: "BLOQUEO", valor: 4, objetivo: "PROPIO" }]
-    },
+    }
 };
 
-/**
- * Obtiene reliquias priorizando que no estén ya en manos de ningún jugador.
- * Si se acaban las reliquias únicas disponibles, rellena repitiendo del pool válido.
- */
+export interface IPortadorReliquiasMinimo {
+    personajeId: PersonajeId | string;
+    reliquias?: Iterable<string>;
+    reliquiaRecompensa?: string;
+}
+
 export function obtenerReliquiasRecompensa(
-    jugadoresMap: Map<string, any> | any,
+    jugadoresMap: { forEach(cb: (j: IPortadorReliquiasMinimo) => void): void },
     cantidad: number,
     personajeFiltro?: PersonajeId
 ): string[] {
@@ -228,16 +207,17 @@ export function obtenerReliquiasRecompensa(
     if (personajeFiltro && PERSONAJES_INFO[personajeFiltro]) {
         PERSONAJES_INFO[personajeFiltro].clases.forEach((c) => clasesValidas.add(c));
     } else {
-        // Para un Cofre grupal, permitimos reliquias neutrales y de las clases de los jugadores presentes
-        jugadoresMap.forEach((j: any) => {
+        jugadoresMap.forEach((j) => {
             const info = PERSONAJES_INFO[j.personajeId as PersonajeId];
             info?.clases.forEach((c) => clasesValidas.add(c));
         });
     }
 
-    jugadoresMap.forEach((j: any) => {
+    jugadoresMap.forEach((j) => {
         if (j.reliquias) {
-            j.reliquias.forEach((rId: string) => yaObtenidas.add(rId));
+            for (const rId of j.reliquias) {
+                yaObtenidas.add(rId);
+            }
         }
         if (j.reliquiaRecompensa) {
             yaObtenidas.add(j.reliquiaRecompensa);
@@ -260,7 +240,6 @@ export function obtenerReliquiasRecompensa(
         resultado.push(id);
     }
 
-    // Fallback: si no alcanzaron las únicas, rellenamos permitiendo repetidas
     let idxFallback = 0;
     while (resultado.length < cantidad && todasValidas.length > 0) {
         resultado.push(todasValidas[idxFallback % todasValidas.length]);

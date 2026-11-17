@@ -1,98 +1,280 @@
 import { SpireState, PlayerState, EnemyState } from "../rooms/schema/SpireState";
-import { CATALOGO_CARTAS, IEfecto, TipoEfecto, EstadoId } from "../../../assets/cliente/compartido/Cartas";
+import { CATALOGO_CARTAS } from "../../../assets/cliente/compartido/Cartas";
+import {
+    DescriptorEfecto,
+    EstadoId,
+    FuenteDanio,
+    TipoObjetivo
+} from "../../../assets/cliente/compartido/CondicionesYEfectos";
 import { ENEMIGOS_INFO } from "../../../assets/cliente/compartido/Enemigos";
-import { CONFIG_MAPA } from "../../../assets/cliente/compartido/Mapa";
+import { EventoVisualCombate } from "../../../assets/cliente/compartido/GameTypes";
+import { ActionQueue } from "./ActionQueue";
+import { CombatEventBus, EntidadCombate } from "./CombatEventBus";
+import {
+    AccionAplicarDanio,
+    AccionAplicarEstado,
+    AccionCurarHp,
+    AccionGanarBloqueo,
+    AccionGanarEnergia,
+    AccionRobarCartas,
+    AccionVerificarFinCombate
+} from "./CombatActions";
 import { RelicEngine } from "./RelicEngine";
 
-type EntidadCombate = PlayerState | EnemyState;
-type EfectoHandler = (state: SpireState, lanzador: PlayerState, efecto: IEfecto, objetivoId?: string) => void;
+export class CombatEngine {
+    private static colaActiva: ActionQueue = new ActionQueue();
+    private static busEventos: CombatEventBus = CombatEngine.crearBusConSistemas();
+    private static bufferVisualSala: EventoVisualCombate[] = [];
 
-const EFECTO_HANDLERS: Record<TipoEfecto, EfectoHandler> = {
-    DANIO: (state, lanzador, efecto, objetivoId) => {
-        const objetivos = resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId);
-        for (const obj of objetivos) {
-            CombatEngine.aplicarDanio(state, lanzador, obj, efecto.valor);
+    private static crearBusConSistemas(): CombatEventBus {
+        const bus = new CombatEventBus();
+
+        bus.suscribir("AL_INICIAR_COMBATE", ({ state, cola }) => {
+            RelicEngine.dispararParaTodos("AL_INICIAR_COMBATE", state, {}, cola);
+        });
+
+        bus.suscribir("AL_INICIAR_TURNO", ({ state, cola, jugador }) => {
+            RelicEngine.dispararParaJugador("AL_INICIAR_TURNO", state, jugador, {}, cola);
+        });
+
+        bus.suscribir("AL_TERMINAR_TURNO", ({ state, cola, jugador }) => {
+            RelicEngine.dispararParaJugador("AL_TERMINAR_TURNO", state, jugador, {}, cola);
+        });
+
+        bus.suscribir("AL_JUGAR_CARTA", ({ state, cola, jugador, objetivoId }) => {
+            RelicEngine.dispararParaJugador("AL_JUGAR_CARTA", state, jugador, { objetivoId }, cola);
+        });
+
+        bus.suscribir("AL_INFLIGIR_DANIO", ({ state, cola, atacante, defensor, danioInfligido }) => {
+            RelicEngine.dispararParaJugador(
+                "AL_INFLIGIR_DANIO",
+                state,
+                atacante,
+                { objetivoId: defensor.uid, danioInfligido },
+                cola
+            );
+        });
+
+        bus.suscribir("AL_RECIBIR_DANIO", ({ state, cola, defensor, atacante, danioRecibido }) => {
+            RelicEngine.dispararParaJugador(
+                "AL_RECIBIR_DANIO",
+                state,
+                defensor,
+                {
+                    atacante,
+                    objetivoId: atacante instanceof EnemyState ? atacante.uid : undefined,
+                    danioRecibido
+                },
+                cola
+            );
+        });
+
+        bus.suscribir("AL_MORIR_ENTIDAD", ({ state, cola, entidadMuerta, autorMuerte }) => {
+            if (entidadMuerta instanceof EnemyState && autorMuerte instanceof PlayerState) {
+                RelicEngine.dispararParaJugador(
+                    "AL_MORIR_ENEMIGO",
+                    state,
+                    autorMuerte,
+                    { objetivoId: entidadMuerta.uid },
+                    cola
+                );
+            }
+        });
+
+        bus.suscribir("AL_FINALIZAR_COMBATE", ({ state, cola }) => {
+            RelicEngine.dispararParaTodos("AL_FINALIZAR_COMBATE", state, {}, cola);
+        });
+
+        return bus;
+    }
+
+    public static obtenerColaActiva(): ActionQueue {
+        return this.colaActiva;
+    }
+
+    public static obtenerBusEventos(): CombatEventBus {
+        return this.busEventos;
+    }
+
+    public static procesarColaPendiente(state: SpireState): EventoVisualCombate[] {
+        const nuevos = this.colaActiva.procesarTodo(state, this.busEventos);
+        if (nuevos.length > 0) {
+            this.bufferVisualSala.push(...nuevos);
         }
-    },
-    BLOQUEO: (state, lanzador, efecto, objetivoId) => {
-        const objetivos = resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId);
-        for (const obj of objetivos) {
-            obj.bloqueo += efecto.valor;
+        return nuevos;
+    }
+
+    /** Devuelve y limpia todos los eventos visuales acumulados para emitirlos a los clientes */
+    public static consumirEventosVisuales(): EventoVisualCombate[] {
+        const copia = [...this.bufferVisualSala];
+        this.bufferVisualSala = [];
+        return copia;
+    }
+
+    public static resolverObjetivos(
+        state: SpireState,
+        lanzador: PlayerState,
+        tipo: TipoObjetivo,
+        objetivoId?: string,
+        atacanteContexto?: EntidadCombate
+    ): EntidadCombate[] {
+        switch (tipo) {
+            case "PROPIO":
+                return lanzador.hp > 0 ? [lanzador] : [];
+            case "ATACANTE":
+                return atacanteContexto && atacanteContexto.hp > 0 ? [atacanteContexto] : [];
+            case "ENEMIGO": {
+                const enemigo = state.enemigos.find((e) => e.uid === objetivoId && e.hp > 0);
+                return enemigo ? [enemigo] : [];
+            }
+            case "ENEMIGO_ALEATORIO": {
+                const vivos = state.enemigos.filter((e) => e.hp > 0);
+                if (vivos.length === 0) return [];
+                const indiceAleatorio = Math.floor(Math.random() * vivos.length);
+                return [vivos[indiceAleatorio]];
+            }
+            case "TODOS_ENEMIGOS":
+                return state.enemigos.filter((e) => e.hp > 0);
+            case "ALIADO": {
+                const aliado = objetivoId ? state.jugadores.get(objetivoId) : undefined;
+                return aliado && aliado.hp > 0 ? [aliado] : [];
+            }
+            case "TODOS_ALIADOS": {
+                const vivos: PlayerState[] = [];
+                state.jugadores.forEach((j) => {
+                    if (j.hp > 0) vivos.push(j);
+                });
+                return vivos;
+            }
+            default:
+                return [];
         }
-    },
-    APLICAR_ESTADO: (state, lanzador, efecto, objetivoId) => {
-        if (!efecto.estadoId) return;
-        const objetivos = resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId);
-        for (const obj of objetivos) {
-            const actual = obj.estados.get(efecto.estadoId) || 0;
-            obj.estados.set(efecto.estadoId, actual + efecto.valor);
-        }
-    },
-    ROBAR_CARTA: (_state, lanzador, efecto) => {
-        CombatEngine.robarCartas(lanzador, efecto.valor);
-    },
-    GANAR_ENERGIA: (_state, lanzador, efecto) => {
-        lanzador.energia += efecto.valor;
-    },
-    CURAR_HP: (state, lanzador, efecto, objetivoId) => {
-        const objetivos = resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId);
-        for (const obj of objetivos) {
-            if (obj.hp > 0) {
-                obj.hp = Math.min(obj.hpMax, obj.hp + efecto.valor);
+    }
+
+    public static encolarEfectos(
+        state: SpireState,
+        cola: ActionQueue,
+        lanzador: PlayerState,
+        efectos: DescriptorEfecto[],
+        objetivoId?: string,
+        atacanteContexto?: EntidadCombate,
+        fuentePorDefecto: FuenteDanio = "ATAQUE_CARTA"
+    ): void {
+        for (const efecto of efectos) {
+            switch (efecto.tipo) {
+                case "DANIO": {
+                    const golpes = Math.max(1, efecto.repeticiones || 1);
+                    const fuente = efecto.fuente || fuentePorDefecto;
+
+                    for (let hit = 1; hit <= golpes; hit++) {
+                        // Resolvemos el objetivo dentro de una acción diferida para que ENEMIGO_ALEATORIO
+                        // elija un nuevo enemigo vivo en cada impacto del boomerang
+                        cola.encolarAlFinal({
+                            ejecutar: (st, q) => {
+                                const objetivos = this.resolverObjetivos(
+                                    st,
+                                    lanzador,
+                                    efecto.objetivo,
+                                    objetivoId,
+                                    atacanteContexto
+                                );
+                                for (const obj of objetivos) {
+                                    const objId = obj instanceof PlayerState ? obj.sessionId : obj.uid;
+                                    q.emitirVisual({
+                                        tipo: "ATAQUE_EJECUTADO",
+                                        atacanteId: lanzador.sessionId,
+                                        objetivoId: objId,
+                                        indiceGolpe: hit,
+                                        totalGolpes: golpes
+                                    });
+                                    q.encolarAlInicio(new AccionAplicarDanio(lanzador, obj, efecto.valor, fuente));
+                                }
+                            }
+                        });
+                    }
+                    break;
+                }
+                case "BLOQUEO": {
+                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    for (const obj of objetivos) {
+                        cola.encolarAlFinal(new AccionGanarBloqueo(obj, efecto.valor));
+                    }
+                    break;
+                }
+                case "APLICAR_ESTADO": {
+                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    for (const obj of objetivos) {
+                        cola.encolarAlFinal(new AccionAplicarEstado(obj, efecto.estadoId, efecto.valor));
+                    }
+                    break;
+                }
+                case "ROBAR_CARTA": {
+                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    for (const obj of objetivos) {
+                        if (obj instanceof PlayerState) {
+                            cola.encolarAlFinal(
+                                new AccionRobarCartas(
+                                    obj,
+                                    efecto.valor,
+                                    (arr) => this.mezclarArray(arr),
+                                    (j) => this.actualizarContadoresMazo(j)
+                                )
+                            );
+                        }
+                    }
+                    break;
+                }
+                case "GANAR_ENERGIA": {
+                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    for (const obj of objetivos) {
+                        if (obj instanceof PlayerState) {
+                            cola.encolarAlFinal(new AccionGanarEnergia(obj, efecto.valor));
+                        }
+                    }
+                    break;
+                }
+                case "CURAR_HP": {
+                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    for (const obj of objetivos) {
+                        cola.encolarAlFinal(new AccionCurarHp(obj, efecto.valor));
+                    }
+                    break;
+                }
+                case "CONDICIONAL": {
+                    const cumple = RelicEngine.evaluarCondicion(efecto.condicion, state, lanzador, {
+                        objetivoId,
+                        atacante: atacanteContexto
+                    });
+                    const rama = cumple ? efecto.efectosSiCumple : (efecto.efectosSiNoCumple || []);
+                    this.encolarEfectos(state, cola, lanzador, rama, objetivoId, atacanteContexto, fuentePorDefecto);
+                    break;
+                }
             }
         }
     }
-};
 
-function resolverObjetivos(state: SpireState, lanzador: PlayerState, tipo: string, objetivoId?: string): EntidadCombate[] {
-    switch (tipo) {
-        case "PROPIO":
-            return [lanzador];
-        case "ENEMIGO": {
-            const enemigo = state.enemigos.find((e) => e.uid === objetivoId && e.hp > 0);
-            return enemigo ? [enemigo] : [];
-        }
-        case "ENEMIGO_ALEATORIO": {
-            const vivos = state.enemigos.filter((e) => e.hp > 0);
-            if (vivos.length === 0) return [];
-            const indiceAleatorio = Math.floor(Math.random() * vivos.length);
-            return [vivos[indiceAleatorio]];
-        }
-        case "TODOS_ENEMIGOS":
-            return state.enemigos.filter((e) => e.hp > 0);
-        case "ALIADO": {
-            const aliado = objetivoId ? state.jugadores.get(objetivoId) : undefined;
-            return aliado && aliado.hp > 0 ? [aliado] : [];
-        }
-        case "TODOS_ALIADOS": {
-            const vivos: PlayerState[] = [];
-            state.jugadores.forEach((j) => {
-                if (j.hp > 0) vivos.push(j);
-            });
-            return vivos;
-        }
-        default:
-            return [];
-    }
-}
-
-export class CombatEngine {
-
-    public static ejecutarEfecto(state: SpireState, lanzador: PlayerState, efecto: IEfecto, objetivoId?: string) {
-        const handler = EFECTO_HANDLERS[efecto.tipo];
-        if (handler) {
-            handler(state, lanzador, efecto, objetivoId);
-        }
+    public static ejecutarEfecto(
+        state: SpireState,
+        lanzador: PlayerState,
+        efecto: DescriptorEfecto,
+        objetivoId?: string
+    ): void {
+        this.encolarEfectos(state, this.colaActiva, lanzador, [efecto], objetivoId);
+        this.procesarColaPendiente(state);
     }
 
-    static jugarCarta(state: SpireState, jugador: PlayerState, indiceMano: number, objetivoId?: string): boolean {
+    public static jugarCarta(
+        state: SpireState,
+        jugador: PlayerState,
+        indiceMano: number,
+        objetivoId?: string
+    ): boolean {
         if (state.faseActual !== "COMBAT" || jugador.hp <= 0 || jugador.turnoTerminado) return false;
         if (indiceMano < 0 || indiceMano >= jugador.mano.length) return false;
 
         const cartaId = jugador.mano[indiceMano];
         const cartaData = CATALOGO_CARTAS[cartaId];
-        if (!cartaData) return false;
-        if (jugador.energia < cartaData.costo) return false;
+        if (!cartaData || jugador.energia < cartaData.costo) return false;
 
         if (cartaData.objetivoSeleccion === "ENEMIGO") {
             const existeEnemigoVivo = state.enemigos.some((e) => e.uid === objetivoId && e.hp > 0);
@@ -102,83 +284,57 @@ export class CombatEngine {
             if (!aliado || aliado.hp <= 0) return false;
         }
 
-        // 1. Cobrar energía y sacar de la mano
+        // 1. Cobrar energía y retirar de la mano
         jugador.energia -= cartaData.costo;
         jugador.mano.splice(indiceMano, 1);
 
-        // 2. Actualizar contadores para reliquias (ej. Sobrecarga, Daga Rítmica)
+        // 2. Actualizar contadores de turno/combate
         jugador.cartasJugadasTurno += 1;
         jugador.cartasJugadasCombate += 1;
-        const esCartaDeAtaque =
-            (cartaData as any).tipo?.toUpperCase() === "ATAQUE" ||
-            cartaData.efectos.some((ef) => ef.tipo === "DANIO");
-        if (esCartaDeAtaque) {
+        if (cartaData.tipo === "ATAQUE") {
             jugador.ataquesJugadosTurno += 1;
         }
 
-        // 3. Ejecutar efectos de la carta
-        for (const efecto of cartaData.efectos) {
-            this.ejecutarEfecto(state, jugador, efecto, objetivoId);
-        }
-
-        // 4. Disparar reliquias AL_JUGAR_CARTA
-        RelicEngine.dispararParaJugador("AL_JUGAR_CARTA", state, jugador, {
-            cartaJugada: cartaData,
+        this.colaActiva.emitirVisual({
+            tipo: "CARTA_JUGADA",
+            jugadorId: jugador.sessionId,
+            cartaId: cartaData.id,
             objetivoId
         });
 
-        // 5. Mandar al descarte y verificar victoria
+        // 3. Encolar los efectos de la carta
+        this.encolarEfectos(state, this.colaActiva, jugador, cartaData.efectos, objetivoId, undefined, "ATAQUE_CARTA");
+
+        // 4. Emitir evento AL_JUGAR_CARTA al bus
+        this.busEventos.emitir("AL_JUGAR_CARTA", {
+            state,
+            cola: this.colaActiva,
+            jugador,
+            carta: cartaData,
+            objetivoId
+        });
+
+        // 5. Mandar al descarte y procesar toda la cola de reacciones
         jugador.descarteInterno.push(cartaId);
         this.actualizarContadoresMazo(jugador);
-        this.verificarVictoriaCombate(state);
+        this.colaActiva.encolarAlFinal(new AccionVerificarFinCombate());
+        this.procesarColaPendiente(state);
+
         return true;
     }
 
-    static aplicarDanio(state: SpireState, atacante: EntidadCombate, defensor: EntidadCombate, danioBase: number) {
-        if (defensor.hp <= 0) return;
-
-        let monto = danioBase + (atacante.estados.get("FUERZA") || 0);
-        if ((atacante.estados.get("DEBIL") || 0) > 0) {
-            monto = Math.floor(monto * 0.75);
-        }
-        if ((defensor.estados.get("VULNERABLE") || 0) > 0) {
-            monto = Math.floor(monto * 1.5);
-        }
-        monto = Math.max(0, monto);
-
-        const danioTrasBloqueo = Math.max(0, monto - defensor.bloqueo);
-        defensor.bloqueo = Math.max(0, defensor.bloqueo - monto);
-        defensor.hp = Math.max(0, defensor.hp - danioTrasBloqueo);
-
-        // Si el defensor es un jugador siendo atacado por un enemigo:
-        if (defensor instanceof PlayerState && atacante instanceof EnemyState) {
-            // 1. Estado ESPINAS: devuelve daño directo al enemigo que lo atacó
-            const espinas = defensor.estados.get("ESPINAS") || 0;
-            if (espinas > 0 && atacante.hp > 0) {
-                atacante.hp = Math.max(0, atacante.hp - espinas);
-            }
-
-            // 2. Reliquias AL_RECIBIR_DANIO (cuando pierde HP real)
-            if (danioTrasBloqueo > 0) {
-                RelicEngine.dispararParaJugador("AL_RECIBIR_DANIO", state, defensor, {
-                    danioRecibido: danioTrasBloqueo,
-                    atacante
-                });
-            }
-        }
-
-        // Si el atacante es un jugador golpeando a un enemigo:
-        if (atacante instanceof PlayerState && defensor instanceof EnemyState) {
-            if (danioTrasBloqueo > 0 && defensor.hp > 0) {
-                RelicEngine.dispararParaJugador("AL_INFLIGIR_DANIO", state, atacante, {
-                    objetivoId: defensor.uid,
-                    danioInfligido: danioTrasBloqueo
-                });
-            }
-        }
+    public static aplicarDanio(
+        state: SpireState,
+        atacante: EntidadCombate,
+        defensor: EntidadCombate,
+        danioBase: number,
+        fuente: FuenteDanio = "ATAQUE_CARTA"
+    ): void {
+        this.colaActiva.encolarAlFinal(new AccionAplicarDanio(atacante, defensor, danioBase, fuente));
+        this.procesarColaPendiente(state);
     }
 
-    static prepararMazoCombate(jugador: PlayerState) {
+    public static prepararMazoCombate(jugador: PlayerState): void {
         jugador.estados.clear();
         jugador.mano.clear();
         jugador.bloqueo = 0;
@@ -191,26 +347,17 @@ export class CombatEngine {
         this.actualizarContadoresMazo(jugador);
     }
 
-    static robarCartas(jugador: PlayerState, cantidad: number) {
-        for (let i = 0; i < cantidad; i++) {
-            if (jugador.mano.length >= 10) break;
-
-            if (jugador.pilaRoboInterna.length === 0) {
-                if (jugador.descarteInterno.length === 0) break;
-                jugador.pilaRoboInterna = [...jugador.descarteInterno];
-                jugador.descarteInterno = [];
-                this.mezclarArray(jugador.pilaRoboInterna);
-            }
-
-            const cartaRobada = jugador.pilaRoboInterna.pop();
-            if (cartaRobada) {
-                jugador.mano.push(cartaRobada);
-            }
-        }
-        this.actualizarContadoresMazo(jugador);
+    public static robarCartas(jugador: PlayerState, cantidad: number): void {
+        const accion = new AccionRobarCartas(
+            jugador,
+            cantidad,
+            (arr) => this.mezclarArray(arr),
+            (j) => this.actualizarContadoresMazo(j)
+        );
+        accion.ejecutar();
     }
 
-    static descartarMano(jugador: PlayerState) {
+    public static descartarMano(jugador: PlayerState): void {
         while (jugador.mano.length > 0) {
             const carta = jugador.mano.pop();
             if (carta) jugador.descarteInterno.push(carta);
@@ -218,8 +365,7 @@ export class CombatEngine {
         this.actualizarContadoresMazo(jugador);
     }
 
-    static reducirEstadosPorTurno(entidad: EntidadCombate) {
-        // FUERZA y ESPINAS no están en esta lista, por lo que duran todo el combate
+    public static reducirEstadosPorTurno(entidad: EntidadCombate): void {
         (["VULNERABLE", "DEBIL"] as EstadoId[]).forEach((estado) => {
             const val = entidad.estados.get(estado) || 0;
             if (val > 1) entidad.estados.set(estado, val - 1);
@@ -227,43 +373,59 @@ export class CombatEngine {
         });
     }
 
-    /** Ejecuta efectos que ocurren al comenzar el turno de una entidad (ej: Veneno) */
-    static procesarInicioTurno(entidad: EntidadCombate) {
+    public static procesarInicioTurno(entidad: EntidadCombate, state?: SpireState): void {
         if (entidad.hp <= 0) return;
 
         const veneno = entidad.estados.get("VENENO") || 0;
         if (veneno > 0) {
-            entidad.hp = Math.max(0, entidad.hp - veneno);
-
             if (veneno > 1) {
                 entidad.estados.set("VENENO", veneno - 1);
             } else {
                 entidad.estados.delete("VENENO");
             }
+
+            if (state) {
+                this.colaActiva.encolarAlFinal(new AccionAplicarDanio(undefined, entidad, veneno, "VENENO"));
+                this.procesarColaPendiente(state);
+            } else {
+                entidad.hp = Math.max(0, entidad.hp - veneno);
+            }
         }
     }
 
-    static ejecutarTurnoEnemigos(state: SpireState) {
+    public static ejecutarTurnoEnemigos(state: SpireState): void {
         state.enemigos.forEach((enemigo) => {
-            if (enemigo.hp <= 0) return;
+            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
 
             enemigo.bloqueo = 0;
+            this.procesarInicioTurno(enemigo, state);
 
-            this.procesarInicioTurno(enemigo);
-            if (enemigo.hp <= 0) {
-                this.verificarVictoriaCombate(state);
-                return;
-            }
+            // Si murió por veneno al empezar su turno, no actúa
+            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
 
             if (enemigo.intencionTipo === "ATACAR") {
                 state.jugadores.forEach((jugador) => {
-                    if (jugador.hp > 0) {
-                        this.aplicarDanio(state, enemigo, jugador, enemigo.intencionValor);
+                    // Verificamos enemigo.hp > 0 en cada paso por si murió con las ESPINAS del jugador anterior
+                    if (enemigo.hp > 0 && jugador.hp > 0 && state.faseActual === "COMBAT") {
+                        this.colaActiva.emitirVisual({
+                            tipo: "ATAQUE_EJECUTADO",
+                            atacanteId: enemigo.uid,
+                            objetivoId: jugador.sessionId,
+                            indiceGolpe: 1,
+                            totalGolpes: 1
+                        });
+                        this.colaActiva.encolarAlFinal(
+                            new AccionAplicarDanio(enemigo, jugador, enemigo.intencionValor, "ATAQUE_ENEMIGO")
+                        );
+                        this.procesarColaPendiente(state);
                     }
                 });
             } else if (enemigo.intencionTipo === "BLOQUEAR") {
-                enemigo.bloqueo += enemigo.intencionValor;
+                this.colaActiva.encolarAlFinal(new AccionGanarBloqueo(enemigo, enemigo.intencionValor));
+                this.procesarColaPendiente(state);
             }
+
+            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
 
             this.reducirEstadosPorTurno(enemigo);
 
@@ -275,27 +437,20 @@ export class CombatEngine {
             }
         });
 
-        // Por si algún enemigo murió golpeando a un jugador con ESPINAS
         this.verificarVictoriaCombate(state);
     }
 
-    public static verificarVictoriaCombate(state: SpireState) {
-        if (state.faseActual !== "COMBAT") return;
-        const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
-        if (!quedaEnemigoVivo) {
-            RelicEngine.dispararParaTodos("AL_FINALIZAR_COMBATE", state);
-
-            state.faseActual = state.pisoActual >= CONFIG_MAPA.CANTIDAD_PISOS ? "VICTORY" : "REWARD";
-            console.log(`¡Combate ganado! Nueva fase: ${state.faseActual}`);
-        }
+    public static verificarVictoriaCombate(state: SpireState): void {
+        this.colaActiva.encolarAlFinal(new AccionVerificarFinCombate());
+        this.procesarColaPendiente(state);
     }
 
-    private static actualizarContadoresMazo(jugador: PlayerState) {
+    private static actualizarContadoresMazo(jugador: PlayerState): void {
         jugador.cantPilaRobo = jugador.pilaRoboInterna.length;
         jugador.cantDescarte = jugador.descarteInterno.length;
     }
 
-    private static mezclarArray(arr: string[]) {
+    private static mezclarArray(arr: string[]): void {
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [arr[i], arr[j]] = [arr[j], arr[i]];

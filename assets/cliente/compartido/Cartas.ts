@@ -1,30 +1,22 @@
 import { CARTAS_COMBATE } from "./AlmacenCartas/CartasCombate";
 import { CARTAS_VENENO } from "./AlmacenCartas/CartasVeneno";
+import { DescriptorEfecto, EstadoId, IEfecto, TipoEfecto, TipoObjetivo } from "./CondicionesYEfectos";
 import { ClaseId, PersonajeId, PERSONAJES_INFO } from "./GameTypes";
 
-export type TipoObjetivo = "ENEMIGO" | "ENEMIGO_ALEATORIO" | "TODOS_ENEMIGOS" | "ALIADO" | "TODOS_ALIADOS" | "PROPIO";
-export type TipoEfecto = "DANIO" | "BLOQUEO" | "APLICAR_ESTADO" | "ROBAR_CARTA" | "GANAR_ENERGIA" | "CURAR_HP";
-export type EstadoId = "FUERZA" | "VULNERABLE" | "DEBIL" | "ESPINAS" | "VENENO"
-export type TipoCartaId = "ATAQUE" | "HABILIDAD" | "PODER"
-
-export interface IEfecto {
-    tipo: TipoEfecto;
-    valor: number;
-    objetivo: TipoObjetivo;
-    estadoId?: EstadoId;
-}
+export type { EstadoId, IEfecto, TipoEfecto, TipoObjetivo, DescriptorEfecto };
+export type TipoCartaId = "ATAQUE" | "HABILIDAD" | "PODER";
 
 export interface ICartaData {
-    id: string
-    nombre: string
-    costo: number
-    descripcion: string
-    sprite: string
-    clase: ClaseId
-    tipo: TipoCartaId
-    enPoolRecompensa: boolean
-    objetivoSeleccion?: "ENEMIGO" | "ALIADO"
-    efectos: IEfecto[]
+    id: string;
+    nombre: string;
+    costo: number;
+    descripcion: string;
+    sprite: string;
+    clase: ClaseId;
+    tipo: TipoCartaId;
+    enPoolRecompensa: boolean;
+    objetivoSeleccion?: "ENEMIGO" | "ALIADO";
+    efectos: DescriptorEfecto[];
 }
 
 const TODAS_LAS_CARTAS: ICartaData[] = [
@@ -48,9 +40,8 @@ export function obtenerMazoInicial(personajeId: string): string[] {
 
 export function generarOpcionesRecompensa(personajeId: PersonajeId, cantidad = 3): string[] {
     const infoPersonaje = PERSONAJES_INFO[personajeId];
-    const clasesPermitidas = infoPersonaje ? infoPersonaje.clases : ["NEUTRAL"];
+    const clasesPermitidas: string[] = infoPersonaje ? [...infoPersonaje.clases] : ["neutral"];
 
-    // Filtra automáticamente todas las cartas válidas para las clases del personaje
     const pool = Object.values(CATALOGO_CARTAS)
         .filter((carta) =>
             carta.enPoolRecompensa !== false &&

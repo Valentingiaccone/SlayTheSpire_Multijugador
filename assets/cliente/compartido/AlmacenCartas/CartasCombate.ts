@@ -45,7 +45,7 @@ export const CARTAS_COMBATE: ICartaData[] = [
     },
     {
         id: "formacion_defensiva",
-        nombre: "Formacion Defensiva",
+        nombre: "Formación Defensiva",
         costo: 1,
         descripcion: "Todos los aliados ganan 6 de bloqueo.",
         clase: "combate",
@@ -136,11 +136,9 @@ export const CARTAS_COMBATE: ICartaData[] = [
         clase: "combate",
         sprite: "golpe_boomerang",
         enPoolRecompensa: true,
-        tipo: "HABILIDAD",
+        tipo: "ATAQUE",
         efectos: [
-            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO" },
-            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO" },
-            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO" }
+            { tipo: "DANIO", valor: 3, objetivo: "ENEMIGO_ALEATORIO", repeticiones: 3 }
         ]
-    },
-]
+    }
+];
