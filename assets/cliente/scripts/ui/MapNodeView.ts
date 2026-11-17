@@ -40,7 +40,9 @@ export class MapNodeView extends Component {
                 COMBATE: "⚔️",
                 ELITE: "👹",
                 COFRE: "📦",
-                JEFE: "💀 JEFE"
+                JEFE: "💀 JEFE",
+                HOGUERA: "🔥",
+                TIENDA: "🛒"
             };
             this.labelTipo.string = iconos[tipo] || "❓";
         }
