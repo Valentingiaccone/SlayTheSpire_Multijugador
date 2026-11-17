@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, EventTouch, Vec3, UITransform, Node, Sprite } from "cc";
+import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
 import { SpriteManager } from "../utils/SpriteManager";
 
@@ -6,21 +6,27 @@ const { ccclass, property } = _decorator;
 
 @ccclass("CardView")
 export class CardView extends Component {
-
-    @property(Label) labelCosto: Label = null;
-    @property(Label) labelNombre: Label = null;
-    @property(Label) labelDescripcion: Label = null;
-    @property(Label) labelTipo: Label = null;
-    @property(Sprite) imagen: Sprite = null;
+    @property(Label) labelCosto: Label = null!;
+    @property(Label) labelNombre: Label = null!;
+    @property(Label) labelDescripcion: Label = null!;
+    @property(Label) labelTipo: Label = null!;
+    @property(Sprite) imagen: Sprite = null!;
 
     private indiceMano: number = -1;
     private cartaData: ICartaData | null = null;
     private posOriginal: Vec3 = new Vec3();
     private arrastrando: boolean = false;
 
-    // Callback que le pasa CombatController (embudo único en cliente)
     private onSolicitarJugar: ((indiceMano: number, objetivoId?: string) => void) | null = null;
     private buscarObjetivoEnPunto: ((tipo: "ENEMIGO" | "ALIADO", touchPosWorld: Vec3) => string | undefined) | null = null;
+
+    public get estaArrastrando(): boolean {
+        return this.arrastrando;
+    }
+
+    public get idCartaActual(): string | undefined {
+        return this.cartaData?.id;
+    }
 
     onLoad() {
         this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
@@ -37,18 +43,28 @@ export class CardView extends Component {
         buscarObjetivo: (tipo: "ENEMIGO" | "ALIADO", pos: Vec3) => string | undefined
     ) {
         this.indiceMano = indice;
-        this.cartaData = data;
         this.onSolicitarJugar = onJugar;
         this.buscarObjetivoEnPunto = buscarObjetivo;
+
+        // Si el jugador está arrastrando esta misma carta en este instante, solo actualizamos su índice sin resetear su posición ni escala
+        if (this.arrastrando && this.cartaData?.id === data.id) {
+            return;
+        }
+
+        const cambioDeCarta = this.cartaData?.id !== data.id;
+        this.cartaData = data;
 
         if (this.labelCosto) this.labelCosto.string = `${data.costo}`;
         if (this.labelNombre) this.labelNombre.string = data.nombre;
         if (this.labelDescripcion) this.labelDescripcion.string = data.descripcion;
         if (this.labelTipo) this.labelTipo.string = data.tipo;
 
-        this.node.setScale(puedePagarse ? 1 : 0.92, puedePagarse ? 1 : 0.92, 1)
+        const escala = puedePagarse ? 1 : 0.92;
+        this.node.setScale(escala, escala, 1);
 
-        SpriteManager.aplicarSprite(this.imagen, "cartas", data.sprite)
+        if (cambioDeCarta) {
+            SpriteManager.aplicarSprite(this.imagen, "cartas", data.sprite);
+        }
     }
 
     private onTouchStart() {
@@ -69,14 +85,11 @@ export class CardView extends Component {
         const desplazamientoY = this.node.position.y - this.posOriginal.y;
         this.node.setPosition(this.posOriginal);
 
-        // Si no se levantó lo suficiente, se cancela el arrastre
         if (desplazamientoY < 90) return;
 
         if (!this.cartaData.objetivoSeleccion) {
-            // Caso 1: Carta sin objetivo (arrastrar hacia arriba) -> llama al embudo
             this.onSolicitarJugar?.(this.indiceMano, undefined);
         } else {
-            // Caso 2: Carta con objetivo (soltar encima de un enemigo o aliado) -> llama al MISMO embudo
             const uiPos = event.getUILocation();
             const objetivoId = this.buscarObjetivoEnPunto?.(
                 this.cartaData.objetivoSeleccion,

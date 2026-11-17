@@ -1,5 +1,6 @@
 import { _decorator, Component, Node, Label, Button, Sprite, Color, instantiate } from "cc";
 import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
+import { IEstadoSalaCliente } from "../../compartido/GameTypes";
 import { CATALOGO_CARTAS } from "../../compartido/Cartas";
 import { CATALOGO_RELIQUIAS } from "../../compartido/Reliquias";
 import { SpriteManager } from "../utils/SpriteManager";
@@ -13,7 +14,6 @@ export class RewardController extends Component {
     @property(Node) contenedorOpciones: Node = null!;
     @property(Node) templateCartaRecompensa: Node = null!;
 
-    // Nodo opcional para mostrar la reliquia cuando se vence a un Élite
     @property(Node) contenedorReliquiaElite: Node = null!;
     @property(Sprite) spriteReliquiaElite: Sprite = null!;
     @property(Label) labelReliquiaElite: Label = null!;
@@ -22,9 +22,11 @@ export class RewardController extends Component {
     @property(Label) labelBtnContinuar: Label = null!;
 
     private nodosOpciones: Node[] = [];
+    private opcionesActuales: string[] = [];
     private cartaSeleccionadaId: string | null = null;
     private reliquiaSeleccionada: boolean = false;
     private ultimoPisoInicializado: number = -1;
+    private ultimaFirmaPropia: string = "";
 
     onLoad() {
         if (this.templateCartaRecompensa) this.templateCartaRecompensa.active = false;
@@ -36,6 +38,7 @@ export class RewardController extends Component {
     onEnable() {
         this.cartaSeleccionadaId = null;
         this.reliquiaSeleccionada = false;
+        this.ultimaFirmaPropia = "";
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
         if (NetworkManager.instance?.room?.state) {
             this.onEstadoCambiado(NetworkManager.instance.room.state);
@@ -46,22 +49,29 @@ export class RewardController extends Component {
         NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
     }
 
-    private onEstadoCambiado(state: any) {
+    private onEstadoCambiado(state: IEstadoSalaCliente) {
         if (state.faseActual !== "REWARD") return;
 
         const miId = NetworkManager.instance?.room?.sessionId;
-        const miJugador = miId ? state.jugadores.get(miId) : null;
+        const miJugador = miId ? state.jugadores.get(miId) : undefined;
         if (!miJugador) return;
 
-        // Si entramos a un nuevo piso de recompensa y hay reliquia de élite, podemos dejarla pre-seleccionada o desmarcar todo
         if (this.ultimoPisoInicializado !== state.pisoActual) {
             this.ultimoPisoInicializado = state.pisoActual;
             this.cartaSeleccionadaId = null;
             this.reliquiaSeleccionada = false;
+            this.ultimaFirmaPropia = "";
         }
 
+        const opciones = Array.from(miJugador.opcionesRecompensa || []);
+        const firmaActual = `${miJugador.recompensaElegida}|${opciones.join(",")}|${miJugador.reliquiaRecompensa}`;
+        if (firmaActual === this.ultimaFirmaPropia) return;
+        this.ultimaFirmaPropia = firmaActual;
+
         if (miJugador.recompensaElegida) {
-            if (this.labelTitulo) this.labelTitulo.string = "Recompensas confirmadas. Esperando a tus aliados...";
+            if (this.labelTitulo) {
+                this.labelTitulo.string = "Recompensas confirmadas. Esperando a tus aliados...";
+            }
             this.nodosOpciones.forEach((n) => (n.active = false));
             if (this.contenedorReliquiaElite) this.contenedorReliquiaElite.active = false;
             if (this.btnContinuar) this.btnContinuar.node.active = false;
@@ -73,15 +83,28 @@ export class RewardController extends Component {
         }
         if (this.btnContinuar) this.btnContinuar.node.active = true;
 
-        this.renderizarCartas(Array.from(miJugador.opcionesRecompensa || []));
+        this.opcionesActuales = opciones;
+        this.renderizarCartas(this.opcionesActuales);
         this.renderizarReliquiaElite(miJugador.reliquiaRecompensa);
         this.actualizarTextoBotonContinuar();
     }
 
     private renderizarCartas(opciones: string[]) {
         while (this.nodosOpciones.length < opciones.length) {
+            const idx = this.nodosOpciones.length;
             const nodo = instantiate(this.templateCartaRecompensa);
             nodo.parent = this.contenedorOpciones;
+            nodo.on(
+                Button.EventType.CLICK,
+                () => {
+                    const cartaId = this.opcionesActuales[idx];
+                    if (!cartaId) return;
+                    this.cartaSeleccionadaId = this.cartaSeleccionadaId === cartaId ? null : cartaId;
+                    this.renderizarCartas(this.opcionesActuales);
+                    this.actualizarTextoBotonContinuar();
+                },
+                this
+            );
             this.nodosOpciones.push(nodo);
         }
 
@@ -103,16 +126,8 @@ export class RewardController extends Component {
             const cardView = nodo.getComponent(CardView);
             cardView?.configurar(i, data, true, () => {}, () => undefined);
 
-            // Destacar visualmente la carta seleccionada (escala mayor y leve elevación)
-            nodo.setScale(estaSeleccionada ? 1.12 : 0.95, estaSeleccionada ? 1.12 : 0.95, 1);
-
-            nodo.off(Button.EventType.CLICK);
-            nodo.on(Button.EventType.CLICK, () => {
-                // Toggle: si toca la misma se deselecciona; si toca otra, reemplaza la anterior
-                this.cartaSeleccionadaId = this.cartaSeleccionadaId === cartaId ? null : cartaId;
-                this.renderizarCartas(opciones);
-                this.actualizarTextoBotonContinuar();
-            });
+            const escala = estaSeleccionada ? 1.12 : 0.95;
+            nodo.setScale(escala, escala, 1);
         });
     }
 
@@ -141,8 +156,12 @@ export class RewardController extends Component {
 
     private onToggleReliquiaElite() {
         this.reliquiaSeleccionada = !this.reliquiaSeleccionada;
-        const state = NetworkManager.instance?.room?.state;
-        if (state) this.onEstadoCambiado(state);
+        const miId = NetworkManager.instance?.room?.sessionId;
+        const miJugador = miId ? NetworkManager.instance?.room?.state.jugadores.get(miId) : undefined;
+        if (miJugador) {
+            this.renderizarReliquiaElite(miJugador.reliquiaRecompensa);
+            this.actualizarTextoBotonContinuar();
+        }
     }
 
     private actualizarTextoBotonContinuar() {
@@ -152,7 +171,6 @@ export class RewardController extends Component {
             cantidad > 0 ? `Continuar (${cantidad} seleccionada/s)` : "Continuar (Saltar todo)";
     }
 
-    // Asignar al Click Events de BtnContinuar
     public onClickContinuar() {
         NetworkManager.instance?.elegirRecompensa(this.cartaSeleccionadaId, this.reliquiaSeleccionada);
     }
