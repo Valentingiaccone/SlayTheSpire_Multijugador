@@ -11,6 +11,7 @@ export interface IExtraContextoReliquia {
     cartaJugada?: ICartaData;
     objetivoId?: string;
     danioRecibido?: number;
+    danioInfligido?: number;
     atacante?: EnemyState;
 }
 
@@ -38,6 +39,7 @@ export class RelicEngine {
             ataquesJugadosTurno: portador.ataquesJugadosTurno,
             cartasJugadasCombate: portador.cartasJugadasCombate,
             danioRecibido: extra.danioRecibido,
+            danioInfligido: extra.danioInfligido,
             atacante: extra.atacante
         };
 

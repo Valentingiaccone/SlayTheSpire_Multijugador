@@ -451,7 +451,7 @@ export class SpireRoom extends Room<SpireState> {
         if (todosTerminaron) {
             CombatEngine.ejecutarTurnoEnemigos(this.state);
 
-            // Si los enemigos murieron por ESPINAS durante su propio ataque:
+            // Si los enemigos murieron por ESPINAS o VENENO durante su propio ataque:
             if (this.state.faseActual === "REWARD") {
                 this.prepararRecompensas();
                 return;
@@ -480,6 +480,8 @@ export class SpireRoom extends Room<SpireState> {
         this.state.jugadores.forEach((j) => {
             if (j.hp <= 0) return;
             j.bloqueo = 0;
+            CombatEngine.procesarInicioTurno(j);
+            if (j.hp <= 0) return;
             j.energia = j.energiaMax;
             j.turnoTerminado = false;
             j.cartasJugadasTurno = 0;

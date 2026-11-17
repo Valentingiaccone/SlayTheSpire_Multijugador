@@ -77,6 +77,7 @@ function resolverObjetivos(state: SpireState, lanzador: PlayerState, tipo: strin
 }
 
 export class CombatEngine {
+
     public static ejecutarEfecto(state: SpireState, lanzador: PlayerState, efecto: IEfecto, objetivoId?: string) {
         const handler = EFECTO_HANDLERS[efecto.tipo];
         if (handler) {
@@ -165,6 +166,16 @@ export class CombatEngine {
                 });
             }
         }
+
+        // Si el atacante es un jugador golpeando a un enemigo:
+        if (atacante instanceof PlayerState && defensor instanceof EnemyState) {
+            if (danioTrasBloqueo > 0 && defensor.hp > 0) {
+                RelicEngine.dispararParaJugador("AL_INFLIGIR_DANIO", state, atacante, {
+                    objetivoId: defensor.uid,
+                    danioInfligido: danioTrasBloqueo
+                });
+            }
+        }
     }
 
     static prepararMazoCombate(jugador: PlayerState) {
@@ -216,10 +227,33 @@ export class CombatEngine {
         });
     }
 
+    /** Ejecuta efectos que ocurren al comenzar el turno de una entidad (ej: Veneno) */
+    static procesarInicioTurno(entidad: EntidadCombate) {
+        if (entidad.hp <= 0) return;
+
+        const veneno = entidad.estados.get("VENENO") || 0;
+        if (veneno > 0) {
+            entidad.hp = Math.max(0, entidad.hp - veneno);
+
+            if (veneno > 1) {
+                entidad.estados.set("VENENO", veneno - 1);
+            } else {
+                entidad.estados.delete("VENENO");
+            }
+        }
+    }
+
     static ejecutarTurnoEnemigos(state: SpireState) {
         state.enemigos.forEach((enemigo) => {
             if (enemigo.hp <= 0) return;
+
             enemigo.bloqueo = 0;
+
+            this.procesarInicioTurno(enemigo);
+            if (enemigo.hp <= 0) {
+                this.verificarVictoriaCombate(state);
+                return;
+            }
 
             if (enemigo.intencionTipo === "ATACAR") {
                 state.jugadores.forEach((jugador) => {

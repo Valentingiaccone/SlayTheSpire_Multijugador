@@ -7,6 +7,7 @@ export type TriggerReliquia =
     | "AL_JUGAR_CARTA"
     | "AL_TERMINAR_TURNO"
     | "AL_RECIBIR_DANIO"
+    | "AL_INFLIGIR_DANIO"
     | "AL_FINALIZAR_COMBATE"
 
 /**
@@ -29,6 +30,8 @@ export interface IReliquiaContexto {
     // Datos al recibir daño
     danioRecibido?: number;
     atacante?: any;
+    // Datos al infligir daño?
+    danioInfligido?: number;
 }
 
 export interface IReliquiaData {
@@ -58,12 +61,38 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
     cocoroch: {
         id: "cocoroch",
         nombre: "Cocoroch",
-        descripcion: "En cada turno, roba 1 carta adicional.",
+        descripcion: "Cada vez que inflijas daño a un enemigo, le aplica 1 de Veneno.",
         icono: "reliquia_cocoroch",
         clase: "crow",
         enPoolRecompensa: false,
-        trigger: "AL_INICIAR_TURNO",
-        efectos: [{ tipo: "ROBAR_CARTA", valor: 1, objetivo: "PROPIO" }]
+        trigger: "AL_INFLIGIR_DANIO",
+        efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "ENEMIGO", estadoId: "VENENO" }]
+    },
+
+    // ================= RELIQUIAS DE ASESINO ===============
+    dinamita: {
+        id: "dinamita",
+        nombre: "Dinamita",
+        descripcion: "Cada 3 cartas que juegues en un mismo turno, inflige 5 de daño a todos los enemigos.",
+        icono: "reliquia_dinamita",
+        clase: "asesino",
+        enPoolRecompensa: true,
+        trigger: "AL_JUGAR_CARTA",
+        condicion: (ctx) => ctx.cartasJugadasTurno > 0 && ctx.cartasJugadasTurno % 3 === 0,
+        efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS" }]
+    },
+
+    // ================= RELIQUIAS DE COMBATE ===============
+    sangre_vengativa: {
+        id: "sangre_vengativa",
+        nombre: "Sangre Vengativa",
+        descripcion: "Cada vez que perdés HP por un ataque enemigo, ganás +1 de Fuerza.",
+        icono: "reliquia_sangre_vengativa",
+        clase: "combate",
+        enPoolRecompensa: true,
+        trigger: "AL_RECIBIR_DANIO",
+        condicion: (ctx) => (ctx.danioRecibido || 0) > 0,
+        efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "PROPIO", estadoId: "FUERZA" }]
     },
 
     // ================= RELIQUIAS DEL POOL =================
@@ -129,17 +158,6 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         condicion: (ctx) => ctx.turnoNumero % 3 === 0,
         efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
     },
-    dinamita: {
-        id: "dinamita",
-        nombre: "Dinamita",
-        descripcion: "Cada 3 cartas que juegues en un mismo turno, inflige 5 de daño a todos los enemigos.",
-        icono: "reliquia_dinamita",
-        clase: "asesino",
-        enPoolRecompensa: true,
-        trigger: "AL_JUGAR_CARTA",
-        condicion: (ctx) => ctx.cartasJugadasTurno > 0 && ctx.cartasJugadasTurno % 3 === 0,
-        efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS" }]
-    },
     spooky: {
         id: "spooky",
         nombre: "Spooky",
@@ -161,17 +179,6 @@ export const CATALOGO_RELIQUIAS: Record<string, IReliquiaData> = {
         trigger: "AL_INICIAR_TURNO",
         condicion: (ctx) => ctx.turnoNumero === 8,
         efectos: [{ tipo: "DANIO", valor: 50, objetivo: "TODOS_ENEMIGOS" }]
-    },
-    sangre_vengativa: {
-        id: "sangre_vengativa",
-        nombre: "Sangre Vengativa",
-        descripcion: "Cada vez que perdés HP por un ataque enemigo, ganás +1 de Fuerza.",
-        icono: "reliquia_sangre_vengativa",
-        clase: "combate",
-        enPoolRecompensa: true,
-        trigger: "AL_RECIBIR_DANIO",
-        condicion: (ctx) => (ctx.danioRecibido || 0) > 0,
-        efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "PROPIO", estadoId: "FUERZA" }]
     },
     sanacion: {
         id: "sanacion",
