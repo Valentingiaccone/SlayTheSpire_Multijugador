@@ -22,7 +22,7 @@ export interface IReglaAparicionNodo {
 }
 
 export const CONFIG_MAPA = {
-    CANTIDAD_PISOS: 8,
+    CANTIDAD_PISOS: 10,
     COLUMNAS: 5,
     MIN_HOJAS_INICIO: 3,
     MAX_HOJAS_INICIO: 4,
@@ -31,7 +31,7 @@ export const CONFIG_MAPA = {
      * Porcentaje (0 a 100) de que un nodo intermedio (Piso 2 a totalPisos - 2) que NO sea EVENTO
      * se camufle con un signo de interrogación ("?") ocultando su verdadero encuentro.
      */
-    PROBABILIDAD_INTERROGANTE_FALSO: 22
+    PROBABILIDAD_INTERROGANTE_FALSO: 3
 };
 
 /**

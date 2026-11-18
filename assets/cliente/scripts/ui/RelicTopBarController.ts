@@ -65,7 +65,7 @@ export class RelicTopBarController extends Component {
             const idx = this.nodosIconos.length;
             const iconoNode = new Node("IconoReliquiaTopBar");
             const uiTrans = iconoNode.addComponent(UITransform);
-            uiTrans.setContentSize(48, 48);
+            uiTrans.setContentSize(65, 65);
 
             const sp = iconoNode.addComponent(Sprite);
             sp.sizeMode = Sprite.SizeMode.CUSTOM;
