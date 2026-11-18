@@ -427,20 +427,22 @@ export class CombatEngine {
                             }
                             if (indicesMejorables.length === 0) return;
 
+                            const manoTemp = [...lanzador.mano];
                             if (efecto.cantidad === "TODAS") {
                                 for (const idx of indicesMejorables) {
-                                    const mejorada = obtenerCartaMejorada(lanzador.mano[idx]);
-                                    if (mejorada) lanzador.mano[idx] = mejorada.id;
+                                    const mejorada = obtenerCartaMejorada(manoTemp[idx]);
+                                    if (mejorada) manoTemp[idx] = mejorada.id;
                                 }
                             } else {
                                 this.mezclarIndices(indicesMejorables);
                                 const limite = Math.min(efecto.cantidad, indicesMejorables.length);
                                 for (let i = 0; i < limite; i++) {
                                     const idx = indicesMejorables[i];
-                                    const mejorada = obtenerCartaMejorada(lanzador.mano[idx]);
-                                    if (mejorada) lanzador.mano[idx] = mejorada.id;
+                                    const mejorada = obtenerCartaMejorada(manoTemp[idx]);
+                                    if (mejorada) manoTemp[idx] = mejorada.id;
                                 }
                             }
+                            this.sincronizarArraySchema(lanzador.mano, manoTemp);
                         }
                     });
                     break;
@@ -448,14 +450,16 @@ export class CombatEngine {
                 case "AGOTAR_CARTA_MANO_AZAR": {
                     cola.encolarAlFinal({
                         ejecutar: () => {
+                            const manoTemp = [...lanzador.mano];
                             for (let i = 0; i < efecto.cantidad; i++) {
-                                if (lanzador.mano.length === 0) break;
-                                const idxAzar = Math.floor(Math.random() * lanzador.mano.length);
-                                const agotada = lanzador.mano.splice(idxAzar, 1)[0];
+                                if (manoTemp.length === 0) break;
+                                const idxAzar = Math.floor(Math.random() * manoTemp.length);
+                                const agotada = manoTemp.splice(idxAzar, 1)[0];
                                 if (agotada) {
                                     lanzador.agotadasInterno.push(agotada);
                                 }
                             }
+                            this.sincronizarArraySchema(lanzador.mano, manoTemp);
                             this.actualizarContadoresMazo(lanzador);
                         }
                     });
@@ -538,7 +542,9 @@ export class CombatEngine {
         }
 
         jugador.energia -= costoRealEnergia;
-        jugador.mano.splice(indiceMano, 1);
+        const nuevaMano = [...jugador.mano];
+        nuevaMano.splice(indiceMano, 1);
+        this.sincronizarArraySchema(jugador.mano, nuevaMano);
 
         if (cartaData.costoOro && cartaData.costoOro > 0) {
             this.colaActiva.encolarAlFinal(new AccionModificarOro(jugador, -cartaData.costoOro));
@@ -595,7 +601,7 @@ export class CombatEngine {
 
     public static prepararMazoCombate(jugador: PlayerState): void {
         jugador.estados.clear();
-        jugador.mano.clear();
+        this.sincronizarArraySchema(jugador.mano, []);
         jugador.bloqueo = 0;
         jugador.hpPerdidoCombate = 0;
         jugador.descarteInterno = [];
@@ -677,9 +683,10 @@ export class CombatEngine {
             this.procesarColaPendiente(state);
         }
 
+        const cartasActuales = [...jugador.mano];
         const retenidasEnMano: string[] = [];
-        while (jugador.mano.length > 0) {
-            const carta = jugador.mano.shift();
+
+        for (const carta of cartasActuales) {
             if (!carta) continue;
             const data = CATALOGO_CARTAS[carta];
             if (data?.eterea) {
@@ -692,7 +699,7 @@ export class CombatEngine {
             }
         }
 
-        retenidasEnMano.forEach((cId) => jugador.mano.push(cId));
+        this.sincronizarArraySchema(jugador.mano, retenidasEnMano);
         this.actualizarContadoresMazo(jugador);
     }
 
@@ -790,19 +797,33 @@ export class CombatEngine {
         this.procesarColaPendiente(state);
     }
 
+    /**
+     * Sincroniza un ArraySchema sin usar .splice() ni .shift() para evitar
+     * que Colyseus desfase los índices o deje cartas fantasma en el cliente.
+     */
+    public static sincronizarArraySchema(schemaArr: any, nuevoContenido: string[]): void {
+        while (schemaArr.length > nuevoContenido.length) {
+            schemaArr.pop();
+        }
+        for (let i = 0; i < nuevoContenido.length; i++) {
+            if (i < schemaArr.length) {
+                if (schemaArr[i] !== nuevoContenido[i]) {
+                    schemaArr[i] = nuevoContenido[i];
+                }
+            } else {
+                schemaArr.push(nuevoContenido[i]);
+            }
+        }
+    }
+
     private static actualizarContadoresMazo(jugador: PlayerState): void {
         jugador.cantPilaRobo = jugador.pilaRoboInterna.length;
         jugador.cantDescarte = jugador.descarteInterno.length;
         jugador.cantAgotadas = jugador.agotadasInterno.length;
 
-        jugador.pilaRobo.clear();
-        jugador.pilaRoboInterna.forEach((id) => jugador.pilaRobo.push(id));
-
-        jugador.descarte.clear();
-        jugador.descarteInterno.forEach((id) => jugador.descarte.push(id));
-
-        jugador.agotadas.clear();
-        jugador.agotadasInterno.forEach((id) => jugador.agotadas.push(id));
+        this.sincronizarArraySchema(jugador.pilaRobo, jugador.pilaRoboInterna);
+        this.sincronizarArraySchema(jugador.descarte, jugador.descarteInterno);
+        this.sincronizarArraySchema(jugador.agotadas, jugador.agotadasInterno);
     }
 
     private static mezclarArray(arr: string[]): void {

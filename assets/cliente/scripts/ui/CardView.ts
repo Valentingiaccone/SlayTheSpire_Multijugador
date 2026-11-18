@@ -203,4 +203,9 @@ export class CardView extends Component {
             }
         }
     }
+
+    onDisable() {
+        this.arrastrando = false;
+        this.ultimoObjetivoHoverId = undefined;
+    }
 }

@@ -22,7 +22,7 @@ export interface IReglaAparicionNodo {
 }
 
 export const CONFIG_MAPA = {
-    CANTIDAD_PISOS: 10,
+    CANTIDAD_PISOS: 12,
     COLUMNAS: 5,
     MIN_HOJAS_INICIO: 3,
     MAX_HOJAS_INICIO: 4,
@@ -39,10 +39,10 @@ export const CONFIG_MAPA = {
  * El Piso 1 es siempre COMBATE, el piso (totalPisos - 1) es siempre HOGUERA y el último es JEFE.
  */
 export const REGLAS_NODOS_MAPA: Partial<Record<TipoNodoMapa, IReglaAparicionNodo>> = {
-    EVENTO: { min: 2, max: 5, probabilidad: 24 },
+    EVENTO: { min: 2, max: 5, probabilidad: 25 },
     ELITE: { min: 2, max: 4, probabilidad: 20 },
-    TIENDA: { min: 1, max: 3, probabilidad: 16 },
-    COFRE: { min: 1, max: 2, probabilidad: 14 },
+    TIENDA: { min: 1, max: 3, probabilidad: 18 },
+    COFRE: { min: 2, max: 3, probabilidad: 15 },
     HOGUERA: { min: 1, max: 2, probabilidad: 14 }
 };
 
