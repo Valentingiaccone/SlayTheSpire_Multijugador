@@ -148,6 +148,12 @@ export type EventoVisualCombate =
           hpActual: number;
       }
     | {
+          tipo: "ORO_CAMBIADO";
+          jugadorId: string;
+          delta: number;
+          oroTotal: number;
+      }
+    | {
           tipo: "RELIQUIA_ACTIVADA";
           jugadorId: string;
           reliquiaId: string;
@@ -187,8 +193,12 @@ export interface IJugadorCliente {
     eventoVotoOpcion: number;
     cantPilaRobo: number;
     cantDescarte: number;
+    cantAgotadas: number;
     mano: Iterable<string> & { length: number; [index: number]: string };
     mazoMaestro: Iterable<string> & { length: number; [index: number]: string };
+    pilaRobo: Iterable<string> & { length: number; [index: number]: string };
+    descarte: Iterable<string> & { length: number; [index: number]: string };
+    agotadas: Iterable<string> & { length: number; [index: number]: string };
     opcionesRecompensa: Iterable<string> & { length: number; [index: number]: string };
     reliquias: Iterable<string> & { length: number; [index: number]: string };
     tiendaCartas: Iterable<string> & { length: number; [index: number]: string };

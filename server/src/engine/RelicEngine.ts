@@ -32,6 +32,8 @@ export class RelicEngine {
                 return portador.ataquesJugadosTurno === condicion.cantidad;
             case "DANIO_RECIBIDO_MAYOR_A":
                 return (params.danioRecibido || 0) > condicion.minimo;
+            case "ORO_MINIMO":
+                return portador.oro >= condicion.minimo;
             case "TIENE_ESTADO": {
                 const objetivos = CombatEngine.resolverObjetivos(
                     state,
@@ -60,7 +62,6 @@ export class RelicEngine {
 
         const cola = colaActiva || CombatEngine.obtenerColaActiva();
 
-        // Si el trigger viene de recibir daño y hay un enemigo atacante, permitimos apuntarle por defecto
         const objetivoPorDefecto =
             params.objetivoId ||
             (params.atacante instanceof EnemyState ? params.atacante.uid : undefined);

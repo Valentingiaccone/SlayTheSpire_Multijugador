@@ -16,6 +16,8 @@ import {
     AccionCurarHp,
     AccionGanarBloqueo,
     AccionGanarEnergia,
+    AccionModificarOro,
+    AccionPerderHp,
     AccionRobarCartas,
     AccionVerificarFinCombate
 } from "./CombatActions";
@@ -135,7 +137,9 @@ export class CombatEngine {
             case "TODOS_ENEMIGOS":
                 return state.enemigos.filter((e) => e.hp > 0);
             case "ALIADO": {
-                const aliado = objetivoId ? state.jugadores.get(objetivoId) : undefined;
+                // Solo permite apuntar a OTRO aliado distinto al lanzador
+                if (!objetivoId || objetivoId === lanzador.sessionId) return [];
+                const aliado = state.jugadores.get(objetivoId);
                 return aliado && aliado.hp > 0 ? [aliado] : [];
             }
             case "TODOS_ALIADOS": {
@@ -186,7 +190,12 @@ export class CombatEngine {
                                             totalGolpes: golpes
                                         });
                                     }
-                                    q.encolarAlInicio(new AccionAplicarDanio(lanzador, obj, efecto.valor, fuente));
+                                    q.encolarAlInicio(
+                                        new AccionAplicarDanio(lanzador, obj, efecto.valor, fuente, {
+                                            oroPorGolpeAlHp: efecto.oroPorGolpeAlHp,
+                                            oroSiMata: efecto.oroSiMata
+                                        })
+                                    );
                                 }
                             }
                         });
@@ -239,13 +248,154 @@ export class CombatEngine {
                     }
                     break;
                 }
-                case "CONDICIONAL": {
-                    const cumple = RelicEngine.evaluarCondicion(efecto.condicion, state, lanzador, {
-                        objetivoId,
-                        atacante: atacanteContexto
+                case "PERDER_HP": {
+                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    for (const obj of objetivos) {
+                        cola.encolarAlFinal(new AccionPerderHp(obj, efecto.valor, lanzador));
+                    }
+                    break;
+                }
+                case "GANAR_ORO": {
+                    cola.encolarAlFinal(new AccionModificarOro(lanzador, efecto.valor));
+                    break;
+                }
+                case "APUESTA_ORO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            const gano = Math.random() * 100 < efecto.probabilidadExito;
+                            const delta = gano ? efecto.oroGanado : -efecto.oroPerdido;
+                            q.encolarAlInicio(new AccionModificarOro(lanzador, delta));
+                        }
                     });
-                    const rama = cumple ? efecto.efectosSiCumple : (efecto.efectosSiNoCumple || []);
-                    this.encolarEfectos(state, cola, lanzador, rama, objetivoId, atacanteContexto, fuentePorDefecto);
+                    break;
+                }
+                case "REPARTIR_ORO_ALIADOS": {
+                    cola.encolarAlFinal({
+                        ejecutar: (st, q) => {
+                            const otrosAliados: PlayerState[] = [];
+                            st.jugadores.forEach((j) => {
+                                if (j.sessionId !== lanzador.sessionId && j.hp > 0) {
+                                    otrosAliados.push(j);
+                                }
+                            });
+                            if (otrosAliados.length === 0 || lanzador.oro <= 0) return;
+
+                            const oroARepartir = Math.floor(lanzador.oro * efecto.porcentaje);
+                            if (oroARepartir <= 0) return;
+
+                            const porAliado = Math.floor(oroARepartir / otrosAliados.length);
+                            const gastoTotal = porAliado * otrosAliados.length;
+                            if (gastoTotal <= 0) return;
+
+                            q.encolarAlInicio(new AccionModificarOro(lanzador, -gastoTotal));
+                            for (const aliado of otrosAliados) {
+                                q.encolarAlInicio(new AccionModificarOro(aliado, porAliado));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "ORO_IGUAL_A_BLOQUEO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            if (lanzador.bloqueo > 0) {
+                                q.encolarAlInicio(new AccionModificarOro(lanzador, lanzador.bloqueo));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "FUERZA_POR_CADA_ORO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            if (efecto.cadaCuantoOro <= 0) return;
+                            const tramos = Math.floor(lanzador.oro / efecto.cadaCuantoOro);
+                            const fuerzaTotal = tramos * efecto.fuerzaGanada;
+                            if (fuerzaTotal > 0) {
+                                q.encolarAlInicio(
+                                    new AccionAplicarEstado(lanzador, "FUERZA", fuerzaTotal)
+                                );
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "ORO_POR_HP_FALTANTE_ENEMIGO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (st, q) => {
+                            const enemigo = st.enemigos.find((e) => e.uid === objetivoId);
+                            if (!enemigo) return;
+                            const hpFaltante = Math.max(0, enemigo.hpMax - enemigo.hp);
+                            const oroGanado = Math.min(
+                                efecto.maximoOro,
+                                hpFaltante * efecto.oroPorHp
+                            );
+                            if (oroGanado > 0) {
+                                q.encolarAlInicio(new AccionModificarOro(lanzador, oroGanado));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "INTERES_ORO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            if (efecto.cadaCuantoOro <= 0) return;
+                            const tramos = Math.floor(lanzador.oro / efecto.cadaCuantoOro);
+                            const ganancia = tramos * efecto.oroGanado;
+                            if (ganancia > 0) {
+                                q.encolarAlInicio(new AccionModificarOro(lanzador, ganancia));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "DUPLICAR_ORO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            if (lanzador.oro > 0) {
+                                q.encolarAlInicio(new AccionModificarOro(lanzador, lanzador.oro));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "BLOQUEO_POR_ORO_GASTADO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            const oroAGastar = Math.min(efecto.maximoOro, lanzador.oro);
+                            if (oroAGastar <= 0) return;
+                            q.encolarAlInicio(new AccionGanarBloqueo(lanzador, oroAGastar));
+                            q.encolarAlInicio(new AccionModificarOro(lanzador, -oroAGastar));
+                        }
+                    });
+                    break;
+                }
+                case "CONDICIONAL": {
+                    cola.encolarAlFinal({
+                        ejecutar: (st, q) => {
+                            const cumple = RelicEngine.evaluarCondicion(
+                                efecto.condicion,
+                                st,
+                                lanzador,
+                                { objetivoId, atacante: atacanteContexto }
+                            );
+                            const rama = cumple
+                                ? efecto.efectosSiCumple
+                                : efecto.efectosSiNoCumple || [];
+                            if (rama.length > 0) {
+                                this.encolarEfectos(
+                                    st,
+                                    q,
+                                    lanzador,
+                                    rama,
+                                    objetivoId,
+                                    atacanteContexto,
+                                    fuentePorDefecto
+                                );
+                            }
+                        }
+                    });
                     break;
                 }
             }
@@ -273,19 +423,29 @@ export class CombatEngine {
 
         const cartaId = jugador.mano[indiceMano];
         const cartaData = CATALOGO_CARTAS[cartaId];
-        if (!cartaData || cartaData.injugable || jugador.energia < cartaData.costo) return false;
+        if (!cartaData || cartaData.injugable) return false;
+        if (jugador.energia < cartaData.costo) return false;
+        if (cartaData.costoOro && jugador.oro < cartaData.costoOro) return false;
 
         if (cartaData.objetivoSeleccion === "ENEMIGO") {
             const existeEnemigoVivo = state.enemigos.some((e) => e.uid === objetivoId && e.hp > 0);
             if (!existeEnemigoVivo) return false;
         } else if (cartaData.objetivoSeleccion === "ALIADO") {
-            const aliado = objetivoId ? state.jugadores.get(objetivoId) : undefined;
+            // Regla estricta: una carta "A un aliado" NO puede jugarse sobre uno mismo
+            if (!objetivoId || objetivoId === jugador.sessionId) return false;
+            const aliado = state.jugadores.get(objetivoId);
             if (!aliado || aliado.hp <= 0) return false;
         }
 
+        // 1. Cobrar energía, cobrar costo de oro (si tiene) y sacar de la mano
         jugador.energia -= cartaData.costo;
         jugador.mano.splice(indiceMano, 1);
 
+        if (cartaData.costoOro && cartaData.costoOro > 0) {
+            this.colaActiva.encolarAlFinal(new AccionModificarOro(jugador, -cartaData.costoOro));
+        }
+
+        // 2. Actualizar contadores
         jugador.cartasJugadasTurno += 1;
         jugador.cartasJugadasCombate += 1;
         if (cartaData.tipo === "ATAQUE") {
@@ -299,8 +459,10 @@ export class CombatEngine {
             objetivoId
         });
 
+        // 3. Encolar efectos de la carta
         this.encolarEfectos(state, this.colaActiva, jugador, cartaData.efectos, objetivoId, undefined, "ATAQUE_CARTA");
 
+        // 4. Emitir evento AL_JUGAR_CARTA
         this.busEventos.emitir("AL_JUGAR_CARTA", {
             state,
             cola: this.colaActiva,
@@ -309,9 +471,15 @@ export class CombatEngine {
             objetivoId
         });
 
-        if (!cartaData.eterea) {
+        // 5. Destino de la carta jugada: PODER se consume, agotar/etérea va a agotadas, el resto va a descarte
+        if (cartaData.tipo === "PODER") {
+            // Los poderes quedan activos como estado en la entidad y no van al descarte ni a agotadas
+        } else if (cartaData.agotar || cartaData.eterea) {
+            jugador.agotadasInterno.push(cartaId);
+        } else {
             jugador.descarteInterno.push(cartaId);
         }
+
         this.actualizarContadoresMazo(jugador);
         this.colaActiva.encolarAlFinal(new AccionVerificarFinCombate());
         this.procesarColaPendiente(state);
@@ -335,6 +503,7 @@ export class CombatEngine {
         jugador.mano.clear();
         jugador.bloqueo = 0;
         jugador.descarteInterno = [];
+        jugador.agotadasInterno = [];
         jugador.pilaRoboInterna = [...jugador.mazoMaestro];
         jugador.cartasJugadasTurno = 0;
         jugador.ataquesJugadosTurno = 0;
@@ -353,10 +522,6 @@ export class CombatEngine {
         accion.ejecutar();
     }
 
-    /**
-     * Procesa los efectos de fin de turno de las cartas que quedaron en mano (ej. Maldiciones)
-     * y descarta la mano (agotando las cartas Etéreas).
-     */
     public static descartarMano(jugador: PlayerState, state?: SpireState): void {
         if (state && jugador.hp > 0) {
             for (let i = 0; i < jugador.mano.length; i++) {
@@ -381,8 +546,9 @@ export class CombatEngine {
             const carta = jugador.mano.pop();
             if (!carta) continue;
             const data = CATALOGO_CARTAS[carta];
-            // Si la carta es Etérea (ej. Torpeza), se agota y NO va al descarte
-            if (!data?.eterea) {
+            if (data?.eterea) {
+                jugador.agotadasInterno.push(carta);
+            } else {
                 jugador.descarteInterno.push(carta);
             }
         }
@@ -400,6 +566,7 @@ export class CombatEngine {
     public static procesarInicioTurno(entidad: EntidadCombate, state?: SpireState): void {
         if (entidad.hp <= 0) return;
 
+        // 1. Veneno
         const veneno = entidad.estados.get("VENENO") || 0;
         if (veneno > 0) {
             if (veneno > 1) {
@@ -413,6 +580,23 @@ export class CombatEngine {
                 this.procesarColaPendiente(state);
             } else {
                 entidad.hp = Math.max(0, entidad.hp - veneno);
+            }
+        }
+
+        if (entidad.hp <= 0) return;
+
+        // 2. Poder "El que no arriesga, no gana" (ARRIESGAR_GANAR)
+        if (entidad instanceof PlayerState && state) {
+            const oroPorTramo = entidad.estados.get("ARRIESGAR_GANAR") || 0;
+            if (oroPorTramo > 0) {
+                const tramosDeVeinte = Math.floor(entidad.oro / 20);
+                const oroGanado = tramosDeVeinte * oroPorTramo;
+
+                this.colaActiva.encolarAlFinal(new AccionPerderHp(entidad, 3, entidad));
+                if (oroGanado > 0) {
+                    this.colaActiva.encolarAlFinal(new AccionModificarOro(entidad, oroGanado));
+                }
+                this.procesarColaPendiente(state);
             }
         }
     }
@@ -470,6 +654,16 @@ export class CombatEngine {
     private static actualizarContadoresMazo(jugador: PlayerState): void {
         jugador.cantPilaRobo = jugador.pilaRoboInterna.length;
         jugador.cantDescarte = jugador.descarteInterno.length;
+        jugador.cantAgotadas = jugador.agotadasInterno.length;
+
+        jugador.pilaRobo.clear();
+        jugador.pilaRoboInterna.forEach((id) => jugador.pilaRobo.push(id));
+
+        jugador.descarte.clear();
+        jugador.descarteInterno.forEach((id) => jugador.descarte.push(id));
+
+        jugador.agotadas.clear();
+        jugador.agotadasInterno.forEach((id) => jugador.agotadas.push(id));
     }
 
     private static mezclarArray(arr: string[]): void {

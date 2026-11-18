@@ -1,4 +1,4 @@
-import { CATALOGO_CARTAS } from "./Cartas";
+import { CATALOGO_CARTAS, CalidadCarta } from "./Cartas";
 import { CATALOGO_RELIQUIAS } from "./Reliquias";
 
 export type ModoEvento = "INDIVIDUAL" | "COMUNITARIO";
@@ -13,6 +13,7 @@ export type EfectoOpcionEvento =
     | { tipo: "GANAR_RELIQUIA" }
     | { tipo: "ELIMINAR_CARTA_AZAR" }
     | { tipo: "ELIMINAR_CARTA_ELECCION" }
+    | { tipo: "ELIMINAR_CARTA_CALIDAD_AZAR"; calidad: CalidadCarta }
     | { tipo: "NADA" };
 
 export interface IOpcionEventoData {
@@ -33,6 +34,7 @@ export interface IJugadorValidacionEvento {
     hpMax: number;
     oro: number;
     mazoLength: number;
+    mazoCartasIds?: Iterable<string>;
 }
 
 export const CATALOGO_EVENTOS: Record<string, IEventoData> = {
@@ -79,6 +81,43 @@ export const CATALOGO_EVENTOS: Record<string, IEventoData> = {
             {
                 textoBase: "Llenarte los bolsillos de oro",
                 efectos: [{ tipo: "GANAR_ORO", cantidad: 60 }]
+            }
+        ]
+    },
+
+    altar_del_coleccionista: {
+        id: "altar_del_coleccionista",
+        titulo: "❓ El Altar del Coleccionista",
+        descripcion:
+            "Un espíritu tasador examina tu baraja. Cuanto más valiosa sea la carta que aceptes sacrificar al azar, mayor será su recompensa.",
+        modo: "INDIVIDUAL",
+        opciones: [
+            {
+                textoBase: "Sacrificar una carta Común",
+                efectos: [
+                    { tipo: "ELIMINAR_CARTA_CALIDAD_AZAR", calidad: "COMUN" },
+                    { tipo: "GANAR_ORO", cantidad: 45 }
+                ]
+            },
+            {
+                textoBase: "Sacrificar una carta Épica",
+                efectos: [
+                    { tipo: "ELIMINAR_CARTA_CALIDAD_AZAR", calidad: "EPICA" },
+                    { tipo: "GANAR_RELIQUIA" }
+                ]
+            },
+            {
+                textoBase: "Sacrificar una carta Legendaria",
+                efectos: [
+                    { tipo: "ELIMINAR_CARTA_CALIDAD_AZAR", calidad: "LEGENDARIA" },
+                    { tipo: "GANAR_RELIQUIA" },
+                    { tipo: "GANAR_ORO", cantidad: 100 },
+                    { tipo: "CURAR_HP", porcentajeHpMax: 0.3 }
+                ]
+            },
+            {
+                textoBase: "Retirarse sin sacrificar nada",
+                efectos: [{ tipo: "NADA" }]
             }
         ]
     },
@@ -136,7 +175,7 @@ export const CATALOGO_EVENTOS: Record<string, IEventoData> = {
         ]
     },
 
-    // ================= EVENTOS COMUNITARIOS (VOTACIÓN GRUPAL) =================
+    // ================= EVENTOS COMUNITARIOS =================
     pacto_del_grupo: {
         id: "pacto_del_grupo",
         titulo: "🤝 Evento Grupal: La Fuente Carmesí",
@@ -204,9 +243,6 @@ export function opcionRequiereElegirCartaMazo(opcion: IOpcionEventoData): boolea
     return opcion.efectos.some((e) => e.tipo === "ELIMINAR_CARTA_ELECCION");
 }
 
-/**
- * Verifica si un jugador individual cumple los requisitos de HP, Oro y tamaño de mazo para una opción.
- */
 export function validarRequisitosOpcionParaJugador(
     opcion: IOpcionEventoData,
     jugador: IJugadorValidacionEvento
@@ -224,14 +260,22 @@ export function validarRequisitosOpcionParaJugador(
         ) {
             return { valida: false, motivoBloqueo: "Mazo mínimo alcanzado" };
         }
+        if (ef.tipo === "ELIMINAR_CARTA_CALIDAD_AZAR") {
+            if (jugador.mazoLength <= 1) {
+                return { valida: false, motivoBloqueo: "Mazo mínimo alcanzado" };
+            }
+            const listaIds = jugador.mazoCartasIds ? Array.from(jugador.mazoCartasIds) : [];
+            const tieneDeEsaCalidad = listaIds.some(
+                (id) => CATALOGO_CARTAS[id]?.calidad === ef.calidad
+            );
+            if (!tieneDeEsaCalidad) {
+                return { valida: false, motivoBloqueo: `No tenés cartas ${ef.calidad}` };
+            }
+        }
     }
     return { valida: true };
 }
 
-/**
- * Construye la descripción detallada de una opción mostrando el nombre exacto de la carta,
- * reliquia o maldición que recibirá el jugador.
- */
 export function formatearTextoOpcionEvento(
     opcion: IOpcionEventoData,
     cartaId?: string,
@@ -279,6 +323,9 @@ export function formatearTextoOpcionEvento(
                 break;
             case "ELIMINAR_CARTA_ELECCION":
                 detalles.push("Elegir y eliminar 1 carta de tu mazo");
+                break;
+            case "ELIMINAR_CARTA_CALIDAD_AZAR":
+                detalles.push(`Perder 1 carta ${ef.calidad} al azar`);
                 break;
             case "NADA":
                 detalles.push("Continuar sin cambios");

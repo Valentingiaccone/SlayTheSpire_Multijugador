@@ -9,12 +9,77 @@ export function obtenerIdEntidad(entidad: EntidadCombate): string {
     return entidad instanceof PlayerState ? entidad.sessionId : entidad.uid;
 }
 
+export interface IOpcionesExtraDanio {
+    oroPorGolpeAlHp?: number;
+    oroSiMata?: number;
+}
+
+export class AccionModificarOro implements IAccionCombate {
+    constructor(private jugador: PlayerState, private delta: number) {}
+
+    ejecutar(_state: SpireState, cola: ActionQueue): void {
+        if (this.delta === 0) return;
+        const antes = this.jugador.oro;
+        this.jugador.oro = Math.max(0, this.jugador.oro + this.delta);
+        const cambioReal = this.jugador.oro - antes;
+
+        if (cambioReal !== 0) {
+            cola.emitirVisual({
+                tipo: "ORO_CAMBIADO",
+                jugadorId: this.jugador.sessionId,
+                delta: cambioReal,
+                oroTotal: this.jugador.oro
+            });
+        }
+    }
+}
+
+export class AccionPerderHp implements IAccionCombate {
+    constructor(
+        private objetivo: EntidadCombate,
+        private cantidad: number,
+        private autor?: EntidadCombate
+    ) {}
+
+    ejecutar(_state: SpireState, cola: ActionQueue): void {
+        if (this.objetivo.hp <= 0 || this.cantidad <= 0) return;
+
+        const antes = this.objetivo.hp;
+        this.objetivo.hp = Math.max(0, this.objetivo.hp - this.cantidad);
+        const perdidoReal = antes - this.objetivo.hp;
+
+        cola.emitirVisual({
+            tipo: "IMPACTO_DANIO",
+            objetivoId: obtenerIdEntidad(this.objetivo),
+            atacanteId: this.autor ? obtenerIdEntidad(this.autor) : undefined,
+            danioAlHp: perdidoReal,
+            danioBloqueado: 0,
+            hpRestante: this.objetivo.hp,
+            bloqueoRestante: this.objetivo.bloqueo,
+            fuente: "EFECTO_DIRECTO"
+        });
+
+        // Poder AVARICIA: Gana X de oro por cada punto de HP que pierdas
+        if (this.objetivo instanceof PlayerState && perdidoReal > 0) {
+            const avaricia = this.objetivo.estados.get("AVARICIA") || 0;
+            if (avaricia > 0) {
+                cola.encolarAlInicio(new AccionModificarOro(this.objetivo, perdidoReal * avaricia));
+            }
+        }
+
+        if (this.objetivo.hp <= 0) {
+            cola.encolarAlInicio(new AccionProcesarMuerte(this.objetivo, this.autor));
+        }
+    }
+}
+
 export class AccionAplicarDanio implements IAccionCombate {
     constructor(
         private atacante: EntidadCombate | undefined,
         private defensor: EntidadCombate,
         private danioBase: number,
-        private fuente: FuenteDanio = "ATAQUE_CARTA"
+        private fuente: FuenteDanio = "ATAQUE_CARTA",
+        private extra: IOpcionesExtraDanio = {}
     ) {}
 
     ejecutar(state: SpireState, cola: ActionQueue, bus: CombatEventBus): void {
@@ -40,8 +105,10 @@ export class AccionAplicarDanio implements IAccionCombate {
         const danioBloqueado = ignoraBloqueo ? 0 : Math.min(this.defensor.bloqueo, monto);
         const danioAlHp = Math.max(0, monto - danioBloqueado);
 
+        const hpAntes = this.defensor.hp;
         this.defensor.bloqueo = Math.max(0, this.defensor.bloqueo - danioBloqueado);
         this.defensor.hp = Math.max(0, this.defensor.hp - danioAlHp);
+        const hpPerdidoReal = hpAntes - this.defensor.hp;
 
         cola.emitirVisual({
             tipo: "IMPACTO_DANIO",
@@ -53,6 +120,31 @@ export class AccionAplicarDanio implements IAccionCombate {
             bloqueoRestante: this.defensor.bloqueo,
             fuente: this.fuente
         });
+
+        // Poder AVARICIA: se dispara siempre que el jugador pierda HP real
+        if (this.defensor instanceof PlayerState && hpPerdidoReal > 0) {
+            const avaricia = this.defensor.estados.get("AVARICIA") || 0;
+            if (avaricia > 0) {
+                cola.encolarAlInicio(
+                    new AccionModificarOro(this.defensor, hpPerdidoReal * avaricia)
+                );
+            }
+        }
+
+        // Bonificaciones de cartas de Ladrón al golpear HP o matar a un enemigo
+        if (this.atacante instanceof PlayerState && this.defensor instanceof EnemyState) {
+            if (hpPerdidoReal > 0 && this.extra.oroPorGolpeAlHp && this.extra.oroPorGolpeAlHp > 0) {
+                cola.encolarAlInicio(
+                    new AccionModificarOro(this.atacante, this.extra.oroPorGolpeAlHp)
+                );
+            }
+
+            if (this.defensor.hp <= 0 && this.extra.oroSiMata && this.extra.oroSiMata > 0) {
+                cola.encolarAlInicio(
+                    new AccionModificarOro(this.atacante, this.extra.oroSiMata)
+                );
+            }
+        }
 
         if (
             this.defensor instanceof PlayerState &&

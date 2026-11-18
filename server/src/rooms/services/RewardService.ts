@@ -1,5 +1,8 @@
 import { SpireState } from "../schema/SpireState";
-import { generarOpcionesRecompensa } from "../../../../assets/cliente/compartido/Cartas";
+import {
+    generarOpcionesRecompensa,
+    ContextoGeneracionCartas
+} from "../../../../assets/cliente/compartido/Cartas";
 import { obtenerReliquiasRecompensa } from "../../../../assets/cliente/compartido/Reliquias";
 import { ECONOMIA_CONFIG } from "../../../../assets/cliente/compartido/GameTypes";
 
@@ -10,11 +13,19 @@ export class RewardService {
     ) {}
 
     public prepararRecompensas(): void {
+        const contexto: ContextoGeneracionCartas = this.state.esCombateJefe
+            ? "JEFE"
+            : this.state.esCombateElite
+            ? "ELITE"
+            : "COMBATE";
+
         const oroBase = this.state.esCombateJefe
             ? ECONOMIA_CONFIG.ORO_COMBATE_JEFE
             : this.state.esCombateElite
             ? ECONOMIA_CONFIG.ORO_COMBATE_ELITE
             : ECONOMIA_CONFIG.ORO_COMBATE_NORMAL;
+
+        const cantJugadores = Math.max(1, this.state.jugadores.size);
 
         this.state.jugadores.forEach((jugador) => {
             if (jugador.hp <= 0) {
@@ -25,10 +36,15 @@ export class RewardService {
             jugador.reliquiaRecompensa = "";
             jugador.oroRecompensa = oroBase;
 
-            const opciones = generarOpcionesRecompensa(jugador.personajeId, 3);
+            const opciones = generarOpcionesRecompensa(
+                jugador.personajeId,
+                3,
+                contexto,
+                cantJugadores
+            );
             opciones.forEach((id) => jugador.opcionesRecompensa.push(id));
 
-            if (this.state.esCombateElite) {
+            if (this.state.esCombateElite || this.state.esCombateJefe) {
                 const reliquias = obtenerReliquiasRecompensa(this.state.jugadores, 1, jugador.personajeId);
                 jugador.reliquiaRecompensa = reliquias[0] || "";
             }

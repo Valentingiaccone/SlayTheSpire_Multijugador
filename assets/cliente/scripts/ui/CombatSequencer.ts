@@ -93,6 +93,18 @@ export class CombatSequencer {
                 break;
             }
 
+            case "ORO_CAMBIADO": {
+                const portador = this.buscarVistaEntidad(ev.jugadorId);
+                if (portador) {
+                    const signo = ev.delta > 0 ? "+" : "";
+                    const color =
+                        ev.delta > 0 ? new Color(255, 225, 90) : new Color(255, 140, 90);
+                    portador.mostrarTextoFlotante(`${signo}${ev.delta} 💰`, color);
+                    await this.esperar(110);
+                }
+                break;
+            }
+
             case "RELIQUIA_ACTIVADA": {
                 const portador = this.buscarVistaEntidad(ev.jugadorId);
                 const infoReliquia = CATALOGO_RELIQUIAS[ev.reliquiaId];

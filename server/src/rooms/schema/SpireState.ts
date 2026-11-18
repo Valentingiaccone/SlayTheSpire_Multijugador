@@ -16,7 +16,6 @@ export class MapNodeState extends Schema {
     @type("string") estado: EstadoNodoMapa = "BLOQUEADO";
     @type(["string"]) siguientesIds = new ArraySchema<string>();
 
-    // Propiedad privada del servidor: si está definida, el "?" es falso y revela este tipo al viajar
     tipoRealOculto?: TipoNodoMapa;
 }
 
@@ -71,18 +70,23 @@ export class PlayerState extends Schema {
     @type(["string"]) eventoOpcionReliquias = new ArraySchema<string>();
     @type(["string"]) eventoOpcionMaldiciones = new ArraySchema<string>();
 
-    // Cartas y Reliquias
+    // Cartas, Pilas de Combate y Reliquias
     @type(["string"]) mano = new ArraySchema<string>();
     @type(["string"]) mazoMaestro = new ArraySchema<string>();
+    @type(["string"]) pilaRobo = new ArraySchema<string>();
+    @type(["string"]) descarte = new ArraySchema<string>();
+    @type(["string"]) agotadas = new ArraySchema<string>();
     @type(["string"]) reliquias = new ArraySchema<string>();
     @type({ map: "number" }) estados = new MapSchema<number>();
 
     @type("number") cantPilaRobo: number = 0;
     @type("number") cantDescarte: number = 0;
+    @type("number") cantAgotadas: number = 0;
 
     // Variables internas de servidor
     pilaRoboInterna: string[] = [];
     descarteInterno: string[] = [];
+    agotadasInterno: string[] = [];
     cartasJugadasTurno: number = 0;
     ataquesJugadosTurno: number = 0;
     cartasJugadasCombate: number = 0;
@@ -118,7 +122,6 @@ export class SpireState extends Schema {
     @type("number") tiempoCuentaRegresivaCofre: number = 0;
     @type(["string"]) reliquiasCofre = new ArraySchema<string>();
 
-    // Estado del Evento "?" activo
     @type("string") eventoActualId: string = "";
     @type("boolean") hayEmpateEvento: boolean = false;
     @type("number") opcionGanadoraEventoIdx: number = -1;

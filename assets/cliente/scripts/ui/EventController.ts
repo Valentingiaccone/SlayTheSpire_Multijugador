@@ -28,15 +28,12 @@ export class EventController extends Component {
     @property(Label) labelDescripcionEvento: Label = null!;
     @property(Label) labelEstadoEvento: Label = null!;
 
-    // Contenedor de los 2 o 3 botones de opción
     @property(Node) contenedorOpciones: Node = null!;
     @property(Node) templateBotonOpcion: Node = null!;
 
-    // Botón de confirmación (solo visible en eventos INDIVIDUALES)
     @property(Button) btnContinuarIndividual: Button = null!;
     @property(Label) labelBtnContinuar: Label = null!;
 
-    // Panel opcional de vista previa (muestra la Carta, Maldición y/o Reliquia de la opción seleccionada)
     @property(Node) contenedorPrevisualizacion: Node = null!;
     @property(CardView) cartaRecompensaPreview: CardView = null!;
     @property(CardView) cartaMaldicionPreview: CardView = null!;
@@ -44,7 +41,6 @@ export class EventController extends Component {
     @property(Sprite) spriteReliquiaPreview: Sprite = null!;
     @property(Label) labelReliquiaPreview: Label = null!;
 
-    // Visor de mazo para opciones que permiten elegir qué carta eliminar
     @property(DeckViewerController) visorMazo: DeckViewerController = null!;
 
     private nodosOpciones: Node[] = [];
@@ -134,7 +130,8 @@ export class EventController extends Component {
                 hp: miJugador.hp,
                 hpMax: miJugador.hpMax,
                 oro: miJugador.oro,
-                mazoLength: miJugador.mazoMaestro?.length || 0
+                mazoLength: miJugador.mazoMaestro?.length || 0,
+                mazoCartasIds: miJugador.mazoMaestro
             });
 
             const seleccionada = this.opcionSeleccionadaIdx === idx;
@@ -292,7 +289,8 @@ export class EventController extends Component {
                 hp: j.hp,
                 hpMax: j.hpMax,
                 oro: j.oro,
-                mazoLength: j.mazoMaestro?.length || 0
+                mazoLength: j.mazoMaestro?.length || 0,
+                mazoCartasIds: j.mazoMaestro
             });
             if (!res.valida) {
                 resultadoFinal = {
@@ -388,7 +386,6 @@ export class EventController extends Component {
         }
     }
 
-    // Asignar al Click Events de btnContinuarIndividual
     public onClickContinuarIndividual() {
         const state = NetworkManager.instance?.room?.state;
         if (!state || state.faseActual !== "EVENT") return;

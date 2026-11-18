@@ -16,6 +16,7 @@ import { CATALOGO_CARTAS } from "../../compartido/Cartas";
 import { CardView } from "./CardView";
 import { CombatEntityView } from "./CombatEntityView";
 import { CombatSequencer } from "./CombatSequencer";
+import { DeckViewerController } from "./DeckViewerController";
 
 const { ccclass, property } = _decorator;
 
@@ -34,6 +35,18 @@ export class CombatController extends Component {
 
     @property(Button) btnTerminarTurno: Button = null!;
     @property(Label) labelBtnTerminarTurno: Label = null!;
+
+    // Botones de Pilas de Combate (Descarte a la izquierda, Robo y Agotadas a la derecha)
+    @property(Node) btnPilaDescarte: Node = null!;
+    @property(Label) labelCantDescarte: Label = null!;
+
+    @property(Node) btnPilaRobo: Node = null!;
+    @property(Label) labelCantRobo: Label = null!;
+
+    @property(Node) btnPilaAgotadas: Node = null!;
+    @property(Label) labelCantAgotadas: Label = null!;
+
+    @property(DeckViewerController) visorMazo: DeckViewerController = null!;
 
     private vistasEnemigos: Map<string, CombatEntityView> = new Map();
     private vistasAliados: Map<string, CombatEntityView> = new Map();
@@ -132,6 +145,13 @@ export class CombatController extends Component {
 
         const miId = NetworkManager.instance?.room?.sessionId;
         const idsPresentes = new Set<string>();
+        let hayOtroAliadoVivo = false;
+
+        jugadores.forEach((j: IJugadorCliente) => {
+            if (j.sessionId !== miId && j.hp > 0) {
+                hayOtroAliadoVivo = true;
+            }
+        });
 
         jugadores.forEach((j: IJugadorCliente) => {
             idsPresentes.add(j.sessionId);
@@ -155,7 +175,8 @@ export class CombatController extends Component {
                         ? "Esperando aliados..."
                         : "Terminar Turno";
                 }
-                this.renderizarMano(j);
+                this.actualizarBotonesPilas(j);
+                this.renderizarMano(j, hayOtroAliadoVivo);
             }
         });
 
@@ -166,7 +187,25 @@ export class CombatController extends Component {
         });
     }
 
-    private renderizarMano(miJugador: IJugadorCliente) {
+    private actualizarBotonesPilas(miJugador: IJugadorCliente) {
+        if (this.labelCantDescarte) {
+            this.labelCantDescarte.string = `${miJugador.cantDescarte || 0}`;
+        }
+        if (this.labelCantRobo) {
+            this.labelCantRobo.string = `${miJugador.cantPilaRobo || 0}`;
+        }
+
+        const cantAgotadas = miJugador.cantAgotadas || 0;
+        if (this.btnPilaAgotadas) {
+            // La pila de agotadas solo aparece en pantalla cuando hay al menos 1 carta agotada
+            this.btnPilaAgotadas.active = cantAgotadas > 0;
+        }
+        if (this.labelCantAgotadas) {
+            this.labelCantAgotadas.string = `${cantAgotadas}`;
+        }
+    }
+
+    private renderizarMano(miJugador: IJugadorCliente, hayOtroAliadoVivo: boolean) {
         if (!this.contenedorMano || !this.templateCarta) return;
 
         while (this.nodosCartas.length < miJugador.mano.length) {
@@ -190,7 +229,18 @@ export class CombatController extends Component {
 
             nodo.active = true;
             const cardView = nodo.getComponent(CardView);
-            const puedePagarse = !miJugador.turnoTerminado && miJugador.energia >= data.costo;
+
+            const alcanzaEnergia = miJugador.energia >= data.costo;
+            const alcanzaOro = !data.costoOro || miJugador.oro >= data.costoOro;
+            const cumpleObjetivoAliado =
+                data.objetivoSeleccion !== "ALIADO" || hayOtroAliadoVivo;
+
+            const puedePagarse =
+                !miJugador.turnoTerminado &&
+                !data.injugable &&
+                alcanzaEnergia &&
+                alcanzaOro &&
+                cumpleObjetivoAliado;
 
             cardView?.configurar(
                 i,
@@ -200,15 +250,19 @@ export class CombatController extends Component {
                 (tipo, touchPos) => this.detectarObjetivoBajoCursor(tipo, touchPos),
                 miJugador.estados,
                 (objetivoId) => this.datosEnemigosPorUid.get(objetivoId)?.estados,
-                true
+                puedePagarse
             );
         });
     }
 
     private detectarObjetivoBajoCursor(tipo: "ENEMIGO" | "ALIADO", touchPos: Vec3): string | undefined {
+        const miId = NetworkManager.instance?.room?.sessionId;
         const mapaVistas = tipo === "ENEMIGO" ? this.vistasEnemigos : this.vistasAliados;
 
         for (const [id, vista] of mapaVistas.entries()) {
+            // Una carta de tipo "ALIADO" nunca puede apuntarse al propio jugador local
+            if (tipo === "ALIADO" && id === miId) continue;
+
             if (vista.contienePuntoMundo(touchPos)) {
                 return id;
             }
@@ -218,5 +272,20 @@ export class CombatController extends Component {
 
     public onClickTerminarTurno() {
         NetworkManager.instance?.terminarTurno();
+    }
+
+    // Asignar al Click Events del botón de Pila de Descarte (izquierda)
+    public onClickAbrirPilaDescarte() {
+        this.visorMazo?.abrirModoPilaCombate("DESCARTE");
+    }
+
+    // Asignar al Click Events del botón de Pila de Robo (derecha)
+    public onClickAbrirPilaRobo() {
+        this.visorMazo?.abrirModoPilaCombate("ROBO");
+    }
+
+    // Asignar al Click Events del botón de Pila de Agotadas (derecha, aparece al agotar cartas)
+    public onClickAbrirPilaAgotadas() {
+        this.visorMazo?.abrirModoPilaCombate("AGOTADAS");
     }
 }

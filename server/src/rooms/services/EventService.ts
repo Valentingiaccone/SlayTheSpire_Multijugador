@@ -9,6 +9,7 @@ import {
     validarRequisitosOpcionParaJugador
 } from "../../../../assets/cliente/compartido/Eventos";
 import {
+    CATALOGO_CARTAS,
     generarOpcionesRecompensa,
     obtenerMaldicionAleatoria
 } from "../../../../assets/cliente/compartido/Cartas";
@@ -33,7 +34,7 @@ export class EventService {
         this.state.opcionGanadoraEventoIdx = -1;
         this.state.tiempoCuentaRegresivaEvento = 0;
 
-        // Si el evento es COMUNITARIO, sorteamos una única reliquia y maldición por opción para que todos vean lo mismo
+        const cantJugadores = Math.max(1, this.state.jugadores.size);
         const reliquiasComunitariasPorOpcion: string[] = [];
         const maldicionesComunitariasPorOpcion: string[] = [];
 
@@ -58,7 +59,12 @@ export class EventService {
             j.eventoOpcionReliquias.clear();
             j.eventoOpcionMaldiciones.clear();
 
-            const cartasPreSorteadas = generarOpcionesRecompensa(j.personajeId, evento.opciones.length);
+            const cartasPreSorteadas = generarOpcionesRecompensa(
+                j.personajeId,
+                evento.opciones.length,
+                "EVENTO",
+                cantJugadores
+            );
             const reliquiasPreSorteadas = obtenerReliquiasRecompensa(
                 this.state.jugadores,
                 evento.opciones.length,
@@ -71,7 +77,9 @@ export class EventService {
                 const pideMaldicion = op.efectos.some((e) => e.tipo === "GANAR_MALDICION");
 
                 j.eventoOpcionCartas.push(
-                    pideCarta ? cartasPreSorteadas[idx % Math.max(1, cartasPreSorteadas.length)] || "golpe_combate" : ""
+                    pideCarta
+                        ? cartasPreSorteadas[idx % Math.max(1, cartasPreSorteadas.length)] || "golpe_combate"
+                        : ""
                 );
 
                 if (evento.modo === "COMUNITARIO") {
@@ -80,7 +88,8 @@ export class EventService {
                 } else {
                     j.eventoOpcionReliquias.push(
                         pideReliquia
-                            ? reliquiasPreSorteadas[idx % Math.max(1, reliquiasPreSorteadas.length)] || "distintivo_abogado"
+                            ? reliquiasPreSorteadas[idx % Math.max(1, reliquiasPreSorteadas.length)] ||
+                                  "distintivo_abogado"
                             : ""
                     );
                     j.eventoOpcionMaldiciones.push(pideMaldicion ? obtenerMaldicionAleatoria() : "");
@@ -91,9 +100,6 @@ export class EventService {
         this.state.faseActual = "EVENT";
     }
 
-    /**
-     * Acción para Eventos INDIVIDUALES (se aplica al confirmar con Continuar).
-     */
     public procesarAccionIndividual(sessionId: string, payload: IPayloadAccionEvento): void {
         if (this.state.faseActual !== "EVENT") return;
         const evento = CATALOGO_EVENTOS[this.state.eventoActualId];
@@ -110,7 +116,8 @@ export class EventService {
             hp: jugador.hp,
             hpMax: jugador.hpMax,
             oro: jugador.oro,
-            mazoLength: jugador.mazoMaestro.length
+            mazoLength: jugador.mazoMaestro.length,
+            mazoCartasIds: jugador.mazoMaestro
         });
         if (!validacion.valida) return;
 
@@ -130,9 +137,6 @@ export class EventService {
         this.verificarFinEvento();
     }
 
-    /**
-     * Votación para Eventos COMUNITARIOS (mismo criterio de mayoría y temporizador que el mapa).
-     */
     public registrarVotoComunitario(sessionId: string, indiceOpcion: number): void {
         if (this.state.faseActual !== "EVENT") return;
         const evento = CATALOGO_EVENTOS[this.state.eventoActualId];
@@ -239,7 +243,8 @@ export class EventService {
                 hp: j.hp,
                 hpMax: j.hpMax,
                 oro: j.oro,
-                mazoLength: j.mazoMaestro.length
+                mazoLength: j.mazoMaestro.length,
+                mazoCartasIds: j.mazoMaestro
             });
             if (!res.valida) todosPueden = false;
         });
@@ -322,6 +327,23 @@ export class EventService {
                         indiceCartaElegida < jugador.mazoMaestro.length
                     ) {
                         jugador.mazoMaestro.splice(indiceCartaElegida, 1);
+                    }
+                    break;
+                }
+                case "ELIMINAR_CARTA_CALIDAD_AZAR": {
+                    if (jugador.mazoMaestro.length > 1) {
+                        const indicesCandidatos: number[] = [];
+                        for (let i = 0; i < jugador.mazoMaestro.length; i++) {
+                            const id = jugador.mazoMaestro[i];
+                            if (CATALOGO_CARTAS[id]?.calidad === ef.calidad) {
+                                indicesCandidatos.push(i);
+                            }
+                        }
+                        if (indicesCandidatos.length > 0) {
+                            const elegido =
+                                indicesCandidatos[Math.floor(Math.random() * indicesCandidatos.length)];
+                            jugador.mazoMaestro.splice(elegido, 1);
+                        }
                     }
                     break;
                 }

@@ -1,4 +1,11 @@
-export type EstadoId = "FUERZA" | "VULNERABLE" | "DEBIL" | "ESPINAS" | "VENENO";
+export type EstadoId =
+    | "FUERZA"
+    | "VULNERABLE"
+    | "DEBIL"
+    | "ESPINAS"
+    | "VENENO"
+    | "AVARICIA"
+    | "ARRIESGAR_GANAR";
 
 export type TipoObjetivo =
     | "PROPIO"
@@ -7,7 +14,7 @@ export type TipoObjetivo =
     | "TODOS_ENEMIGOS"
     | "ALIADO"
     | "TODOS_ALIADOS"
-    | "ATACANTE"; // Nuevo: permite que reliquias defensivas apunten automáticamente al agresor
+    | "ATACANTE";
 
 export type FuenteDanio =
     | "ATAQUE_CARTA"
@@ -17,9 +24,6 @@ export type FuenteDanio =
     | "VENENO"
     | "EFECTO_DIRECTO";
 
-/**
- * Condiciones declarativas puras (serializables y compartibles sin acoplar schemas del servidor).
- */
 export type DescriptorCondicion =
     | { tipo: "TURNO_MULTIPLO"; divisor: number }
     | { tipo: "TURNO_EXACTO"; turno: number }
@@ -27,11 +31,9 @@ export type DescriptorCondicion =
     | { tipo: "CARTAS_TURNO_MULTIPLO"; divisor: number }
     | { tipo: "ATAQUES_TURNO_IGUAL"; cantidad: number }
     | { tipo: "DANIO_RECIBIDO_MAYOR_A"; minimo: number }
+    | { tipo: "ORO_MINIMO"; minimo: number }
     | { tipo: "TIENE_ESTADO"; objetivo: TipoObjetivo; estadoId: EstadoId; minimo?: number };
 
-/**
- * Unión discriminada de efectos: soporta multi-golpe (repeticiones) y efectos condicionales anidados.
- */
 export type DescriptorEfecto =
     | {
           tipo: "DANIO";
@@ -39,6 +41,8 @@ export type DescriptorEfecto =
           objetivo: TipoObjetivo;
           repeticiones?: number;
           fuente?: FuenteDanio;
+          oroPorGolpeAlHp?: number;
+          oroSiMata?: number;
       }
     | {
           tipo: "BLOQUEO";
@@ -67,12 +71,56 @@ export type DescriptorEfecto =
           objetivo: TipoObjetivo;
       }
     | {
+          tipo: "PERDER_HP";
+          valor: number;
+          objetivo: TipoObjetivo;
+      }
+    | {
+          tipo: "GANAR_ORO";
+          valor: number;
+      }
+    | {
+          tipo: "APUESTA_ORO";
+          probabilidadExito: number;
+          oroGanado: number;
+          oroPerdido: number;
+      }
+    | {
+          tipo: "REPARTIR_ORO_ALIADOS";
+          porcentaje: number;
+      }
+    | {
+          tipo: "ORO_IGUAL_A_BLOQUEO";
+      }
+    | {
+          tipo: "FUERZA_POR_CADA_ORO";
+          cadaCuantoOro: number;
+          fuerzaGanada: number;
+      }
+    | {
+          tipo: "ORO_POR_HP_FALTANTE_ENEMIGO";
+          oroPorHp: number;
+          maximoOro: number;
+          objetivo: "ENEMIGO";
+      }
+    | {
+          tipo: "INTERES_ORO";
+          cadaCuantoOro: number;
+          oroGanado: number;
+      }
+    | {
+          tipo: "DUPLICAR_ORO";
+      }
+    | {
+          tipo: "BLOQUEO_POR_ORO_GASTADO";
+          maximoOro: number;
+      }
+    | {
           tipo: "CONDICIONAL";
           condicion: DescriptorCondicion;
           efectosSiCumple: DescriptorEfecto[];
           efectosSiNoCumple?: DescriptorEfecto[];
       };
 
-// Alias de compatibilidad para el código existente
 export type IEfecto = DescriptorEfecto;
 export type TipoEfecto = DescriptorEfecto["tipo"];

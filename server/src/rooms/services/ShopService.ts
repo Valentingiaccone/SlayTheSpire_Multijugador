@@ -16,13 +16,20 @@ export class ShopService {
     ) {}
 
     public iniciarEventoTienda(): void {
+        const cantJugadores = Math.max(1, this.state.jugadores.size);
+
         this.state.jugadores.forEach((jugador) => {
             jugador.tiendaCompletada = false;
             jugador.tiendaEliminacionUsada = false;
             jugador.tiendaCartas.clear();
             jugador.tiendaReliquias.clear();
 
-            const cartasOferta = generarOpcionesRecompensa(jugador.personajeId, 4);
+            const cartasOferta = generarOpcionesRecompensa(
+                jugador.personajeId,
+                4,
+                "TIENDA",
+                cantJugadores
+            );
             cartasOferta.forEach((cId) => jugador.tiendaCartas.push(cId));
 
             const reliquiasOferta = obtenerReliquiasRecompensa(

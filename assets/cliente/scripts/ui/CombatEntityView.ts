@@ -274,12 +274,16 @@ export class CombatEntityView extends Component {
         const debil = leer("DEBIL");
         const espinas = leer("ESPINAS");
         const veneno = leer("VENENO");
+        const avaricia = leer("AVARICIA");
+        const arriesgar = leer("ARRIESGAR_GANAR");
 
         if (fuerza !== 0) lista.push(`💪${fuerza > 0 ? "+" : ""}${fuerza}`);
         if (vuln > 0) lista.push(`💔Vuln(${vuln})`);
         if (debil > 0) lista.push(`📉Débil(${debil})`);
         if (espinas > 0) lista.push(`🌵Espinas(${espinas})`);
         if (veneno > 0) lista.push(`☠️Veneno(${veneno})`);
+        if (avaricia > 0) lista.push(`💰Avaricia(${avaricia})`);
+        if (arriesgar > 0) lista.push(`🎲Arriesgar(${arriesgar})`);
 
         return lista.length > 0 ? ` [${lista.join(" ")}]` : "";
     }

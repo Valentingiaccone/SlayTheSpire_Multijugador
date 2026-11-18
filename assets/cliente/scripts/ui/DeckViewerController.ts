@@ -20,7 +20,13 @@ import { CardView } from "./CardView";
 
 const { ccclass, property } = _decorator;
 
-export type ModoVisorMazo = "CONSULTA" | "FORJA" | "ELIMINAR";
+export type ModoVisorMazo =
+    | "CONSULTA"
+    | "FORJA"
+    | "ELIMINAR"
+    | "PILA_ROBO"
+    | "PILA_DESCARTE"
+    | "PILA_AGOTADAS";
 
 interface IEntradaMazoFiltrada {
     indiceRealEnMazo: number;
@@ -36,7 +42,6 @@ export class DeckViewerController extends Component {
     @property(Prefab) prefabCarta: Prefab = null!;
     @property(Node) btnCerrar: Node = null!;
 
-    // Subpanel de previsualización (usado en FORJA para mostrar [Carta Actual] -> [Carta Mejorada+] y en ELIMINAR)
     @property(Node) panelPrevisualizacion: Node = null!;
     @property(Label) labelTituloPrevisualizacion: Label = null!;
     @property(CardView) cartaPreviewIzquierda: CardView = null!;
@@ -68,6 +73,16 @@ export class DeckViewerController extends Component {
 
     public abrirModoConsulta(): void {
         this.configurarYAbrir("CONSULTA", null, null);
+    }
+
+    public abrirModoPilaCombate(tipoPila: "ROBO" | "DESCARTE" | "AGOTADAS"): void {
+        const modo: ModoVisorMazo =
+            tipoPila === "ROBO"
+                ? "PILA_ROBO"
+                : tipoPila === "DESCARTE"
+                ? "PILA_DESCARTE"
+                : "PILA_AGOTADAS";
+        this.configurarYAbrir(modo, null, null);
     }
 
     public abrirModoForja(
@@ -110,7 +125,6 @@ export class DeckViewerController extends Component {
             this.renderizarMazo(state);
         }
 
-        // Iniciar la cámara siempre arriba del todo para deslizar hacia abajo
         this.scheduleOnce(() => {
             this.scrollViewMazo?.scrollToTop(0.05);
         }, 0);
@@ -126,33 +140,66 @@ export class DeckViewerController extends Component {
         const miJugador = miId ? state.jugadores.get(miId) : undefined;
         if (!miJugador || !this.contenedorCartas || !this.prefabCarta) return;
 
-        const mazoCompleto: string[] = Array.from(miJugador.mazoMaestro || []);
         this.entradasMostradas = [];
 
-        mazoCompleto.forEach((cartaId, indiceReal) => {
-            if (this.modoActual === "FORJA") {
-                if (puedeMejorarseCarta(cartaId)) {
+        if (this.modoActual === "PILA_ROBO") {
+            const copiaRobo = Array.from(miJugador.pilaRobo || []);
+            // Ordenamos alfabéticamente para no revelar el orden exacto de la próxima carta a robar
+            copiaRobo.sort((a, b) => {
+                const nomA = CATALOGO_CARTAS[a]?.nombre || a;
+                const nomB = CATALOGO_CARTAS[b]?.nombre || b;
+                return nomA.localeCompare(nomB);
+            });
+            copiaRobo.forEach((cartaId, idx) => {
+                this.entradasMostradas.push({ indiceRealEnMazo: idx, cartaId });
+            });
+        } else if (this.modoActual === "PILA_DESCARTE") {
+            Array.from(miJugador.descarte || []).forEach((cartaId, idx) => {
+                this.entradasMostradas.push({ indiceRealEnMazo: idx, cartaId });
+            });
+        } else if (this.modoActual === "PILA_AGOTADAS") {
+            Array.from(miJugador.agotadas || []).forEach((cartaId, idx) => {
+                this.entradasMostradas.push({ indiceRealEnMazo: idx, cartaId });
+            });
+        } else {
+            const mazoCompleto: string[] = Array.from(miJugador.mazoMaestro || []);
+            mazoCompleto.forEach((cartaId, indiceReal) => {
+                if (this.modoActual === "FORJA") {
+                    if (puedeMejorarseCarta(cartaId)) {
+                        this.entradasMostradas.push({ indiceRealEnMazo: indiceReal, cartaId });
+                    }
+                } else {
                     this.entradasMostradas.push({ indiceRealEnMazo: indiceReal, cartaId });
                 }
-            } else {
-                this.entradasMostradas.push({ indiceRealEnMazo: indiceReal, cartaId });
-            }
-        });
+            });
+        }
 
         if (this.labelTitulo) {
-            if (this.modoActual === "CONSULTA") {
-                this.labelTitulo.string = `📚 Tu Mazo Total (${this.entradasMostradas.length} cartas)`;
-            } else if (this.modoActual === "FORJA") {
-                this.labelTitulo.string =
-                    this.entradasMostradas.length > 0
-                        ? `🔨 Seleccioná una carta para mejorar (${this.entradasMostradas.length} disponibles)`
-                        : "⚠️ No tenés cartas mejorables en tu mazo";
-            } else {
-                this.labelTitulo.string = `🗑️ Seleccioná una carta para eliminar de tu mazo (${this.entradasMostradas.length} cartas)`;
+            switch (this.modoActual) {
+                case "CONSULTA":
+                    this.labelTitulo.string = `📚 Tu Mazo Total (${this.entradasMostradas.length} cartas)`;
+                    break;
+                case "PILA_ROBO":
+                    this.labelTitulo.string = `🎴 Pila de Robo — Cartas por salir (${this.entradasMostradas.length})`;
+                    break;
+                case "PILA_DESCARTE":
+                    this.labelTitulo.string = `♻️ Pila de Descarte (${this.entradasMostradas.length})`;
+                    break;
+                case "PILA_AGOTADAS":
+                    this.labelTitulo.string = `🔥 Cartas Agotadas en este combate (${this.entradasMostradas.length})`;
+                    break;
+                case "FORJA":
+                    this.labelTitulo.string =
+                        this.entradasMostradas.length > 0
+                            ? `🔨 Seleccioná una carta para mejorar (${this.entradasMostradas.length} disponibles)`
+                            : "⚠️ No tenés cartas mejorables en tu mazo";
+                    break;
+                case "ELIMINAR":
+                    this.labelTitulo.string = `🗑️ Seleccioná una carta para eliminar de tu mazo (${this.entradasMostradas.length} cartas)`;
+                    break;
             }
         }
 
-        // Calcular alto del Content para ScrollView con inicio arriba (Anchor Y = 1 recomendado en Content)
         const totalFilas = Math.max(1, Math.ceil(this.entradasMostradas.length / this.COLUMNAS));
         const altoNecesario = totalFilas * this.ESPACIO_Y + this.MARGEN_SUPERIOR * 2;
         const uiContent = this.contentScroll?.getComponent(UITransform);
@@ -193,7 +240,6 @@ export class DeckViewerController extends Component {
             const col = i % this.COLUMNAS;
             const colCentrada = col - (this.COLUMNAS - 1) / 2;
 
-            // Posicionamos de arriba hacia abajo (Y negativo desde el borde superior del content)
             const x = colCentrada * this.ESPACIO_X;
             const y = -(this.MARGEN_SUPERIOR + fila * this.ESPACIO_Y);
             nodo.setPosition(x, y, 0);
@@ -204,7 +250,7 @@ export class DeckViewerController extends Component {
     }
 
     private onClickCartaEnGrilla(indiceSlot: number) {
-        if (this.modoActual === "CONSULTA") return;
+        if (this.modoActual !== "FORJA" && this.modoActual !== "ELIMINAR") return;
 
         const entrada = this.entradasMostradas[indiceSlot];
         if (!entrada) return;
@@ -265,7 +311,6 @@ export class DeckViewerController extends Component {
         }
     }
 
-    // Asignar al botón "Continuar" del panelPrevisualizacion
     public onClickConfirmarPrevisualizacion() {
         if (!this.entradaSeleccionada) return;
         const { indiceRealEnMazo, cartaId } = this.entradaSeleccionada;
@@ -274,7 +319,6 @@ export class DeckViewerController extends Component {
         callback?.(indiceRealEnMazo, cartaId);
     }
 
-    // Asignar al botón "Cancelar / Elegir otra" del panelPrevisualizacion
     public onClickCancelarPrevisualizacion() {
         this.entradaSeleccionada = null;
         if (this.panelPrevisualizacion) {
@@ -282,7 +326,6 @@ export class DeckViewerController extends Component {
         }
     }
 
-    // Asignar al botón "Cerrar / Volver" del visor principal
     public onClickCerrarVisor() {
         const callbackCancelar = this.alCancelarCallback;
         this.cerrarVisor();
