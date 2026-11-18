@@ -1,11 +1,16 @@
 import { SpireState, PlayerState, EnemyState } from "../rooms/schema/SpireState";
-import { CATALOGO_CARTAS } from "../../../assets/cliente/compartido/Cartas";
+import {
+    CATALOGO_CARTAS,
+    obtenerCartaMejorada,
+    puedeMejorarseCarta
+} from "../../../assets/cliente/compartido/Cartas";
 import {
     DescriptorEfecto,
     EstadoId,
     FuenteDanio,
     TipoObjetivo
 } from "../../../assets/cliente/compartido/CondicionesYEfectos";
+import { CalculadoraCombate } from "../../../assets/cliente/compartido/CalculadoraCombate";
 import { ENEMIGOS_INFO } from "../../../assets/cliente/compartido/Enemigos";
 import { EventoVisualCombate } from "../../../assets/cliente/compartido/GameTypes";
 import { ActionQueue } from "./ActionQueue";
@@ -112,6 +117,23 @@ export class CombatEngine {
         return copia;
     }
 
+    public static contarAtaquesEnMano(jugador: PlayerState): number {
+        let cant = 0;
+        for (let i = 0; i < jugador.mano.length; i++) {
+            const c = CATALOGO_CARTAS[jugador.mano[i]];
+            if (c?.tipo === "ATAQUE") cant++;
+        }
+        return cant;
+    }
+
+    public static manoTieneSoloAtaques(jugador: PlayerState): boolean {
+        for (let i = 0; i < jugador.mano.length; i++) {
+            const c = CATALOGO_CARTAS[jugador.mano[i]];
+            if (!c || c.tipo !== "ATAQUE") return false;
+        }
+        return jugador.mano.length > 0;
+    }
+
     public static resolverObjetivos(
         state: SpireState,
         lanzador: PlayerState,
@@ -137,7 +159,6 @@ export class CombatEngine {
             case "TODOS_ENEMIGOS":
                 return state.enemigos.filter((e) => e.hp > 0);
             case "ALIADO": {
-                // Solo permite apuntar a OTRO aliado distinto al lanzador
                 if (!objetivoId || objetivoId === lanzador.sessionId) return [];
                 const aliado = state.jugadores.get(objetivoId);
                 return aliado && aliado.hp > 0 ? [aliado] : [];
@@ -179,6 +200,17 @@ export class CombatEngine {
                                     objetivoId,
                                     atacanteContexto
                                 );
+
+                                let valorBase = efecto.danioIgualABloqueo
+                                    ? lanzador.bloqueo
+                                    : efecto.valor;
+
+                                if (efecto.danioExtraPorAtaqueEnMano) {
+                                    valorBase +=
+                                        this.contarAtaquesEnMano(lanzador) *
+                                        efecto.danioExtraPorAtaqueEnMano;
+                                }
+
                                 for (const obj of objetivos) {
                                     const objId = obj instanceof PlayerState ? obj.sessionId : obj.uid;
                                     if (fuente === "ATAQUE_CARTA") {
@@ -191,9 +223,10 @@ export class CombatEngine {
                                         });
                                     }
                                     q.encolarAlInicio(
-                                        new AccionAplicarDanio(lanzador, obj, efecto.valor, fuente, {
+                                        new AccionAplicarDanio(lanzador, obj, valorBase, fuente, {
                                             oroPorGolpeAlHp: efecto.oroPorGolpeAlHp,
-                                            oroSiMata: efecto.oroSiMata
+                                            oroSiMata: efecto.oroSiMata,
+                                            multiplicadorFuerza: efecto.multiplicadorFuerza
                                         })
                                     );
                                 }
@@ -371,6 +404,63 @@ export class CombatEngine {
                     });
                     break;
                 }
+                case "COPIAR_CARTA_A_DESCARTE": {
+                    cola.encolarAlFinal({
+                        ejecutar: () => {
+                            const copias = Math.max(1, efecto.cantidad || 1);
+                            for (let i = 0; i < copias; i++) {
+                                lanzador.descarteInterno.push(efecto.cartaId);
+                            }
+                            this.actualizarContadoresMazo(lanzador);
+                        }
+                    });
+                    break;
+                }
+                case "MEJORAR_CARTAS_MANO": {
+                    cola.encolarAlFinal({
+                        ejecutar: () => {
+                            const indicesMejorables: number[] = [];
+                            for (let i = 0; i < lanzador.mano.length; i++) {
+                                if (puedeMejorarseCarta(lanzador.mano[i])) {
+                                    indicesMejorables.push(i);
+                                }
+                            }
+                            if (indicesMejorables.length === 0) return;
+
+                            if (efecto.cantidad === "TODAS") {
+                                for (const idx of indicesMejorables) {
+                                    const mejorada = obtenerCartaMejorada(lanzador.mano[idx]);
+                                    if (mejorada) lanzador.mano[idx] = mejorada.id;
+                                }
+                            } else {
+                                this.mezclarIndices(indicesMejorables);
+                                const limite = Math.min(efecto.cantidad, indicesMejorables.length);
+                                for (let i = 0; i < limite; i++) {
+                                    const idx = indicesMejorables[i];
+                                    const mejorada = obtenerCartaMejorada(lanzador.mano[idx]);
+                                    if (mejorada) lanzador.mano[idx] = mejorada.id;
+                                }
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "AGOTAR_CARTA_MANO_AZAR": {
+                    cola.encolarAlFinal({
+                        ejecutar: () => {
+                            for (let i = 0; i < efecto.cantidad; i++) {
+                                if (lanzador.mano.length === 0) break;
+                                const idxAzar = Math.floor(Math.random() * lanzador.mano.length);
+                                const agotada = lanzador.mano.splice(idxAzar, 1)[0];
+                                if (agotada) {
+                                    lanzador.agotadasInterno.push(agotada);
+                                }
+                            }
+                            this.actualizarContadoresMazo(lanzador);
+                        }
+                    });
+                    break;
+                }
                 case "CONDICIONAL": {
                     cola.encolarAlFinal({
                         ejecutar: (st, q) => {
@@ -424,28 +514,36 @@ export class CombatEngine {
         const cartaId = jugador.mano[indiceMano];
         const cartaData = CATALOGO_CARTAS[cartaId];
         if (!cartaData || cartaData.injugable) return false;
-        if (jugador.energia < cartaData.costo) return false;
+
+        if (cartaData.requiereManoSoloAtaques && !this.manoTieneSoloAtaques(jugador)) {
+            return false;
+        }
+
+        const costoRealEnergia = CalculadoraCombate.calcularCostoCarta(
+            cartaData.costo,
+            cartaData.reduccionCostoPorHpPerdido,
+            jugador.hpPerdidoCombate
+        );
+
+        if (jugador.energia < costoRealEnergia) return false;
         if (cartaData.costoOro && jugador.oro < cartaData.costoOro) return false;
 
         if (cartaData.objetivoSeleccion === "ENEMIGO") {
             const existeEnemigoVivo = state.enemigos.some((e) => e.uid === objetivoId && e.hp > 0);
             if (!existeEnemigoVivo) return false;
         } else if (cartaData.objetivoSeleccion === "ALIADO") {
-            // Regla estricta: una carta "A un aliado" NO puede jugarse sobre uno mismo
             if (!objetivoId || objetivoId === jugador.sessionId) return false;
             const aliado = state.jugadores.get(objetivoId);
             if (!aliado || aliado.hp <= 0) return false;
         }
 
-        // 1. Cobrar energía, cobrar costo de oro (si tiene) y sacar de la mano
-        jugador.energia -= cartaData.costo;
+        jugador.energia -= costoRealEnergia;
         jugador.mano.splice(indiceMano, 1);
 
         if (cartaData.costoOro && cartaData.costoOro > 0) {
             this.colaActiva.encolarAlFinal(new AccionModificarOro(jugador, -cartaData.costoOro));
         }
 
-        // 2. Actualizar contadores
         jugador.cartasJugadasTurno += 1;
         jugador.cartasJugadasCombate += 1;
         if (cartaData.tipo === "ATAQUE") {
@@ -459,10 +557,8 @@ export class CombatEngine {
             objetivoId
         });
 
-        // 3. Encolar efectos de la carta
         this.encolarEfectos(state, this.colaActiva, jugador, cartaData.efectos, objetivoId, undefined, "ATAQUE_CARTA");
 
-        // 4. Emitir evento AL_JUGAR_CARTA
         this.busEventos.emitir("AL_JUGAR_CARTA", {
             state,
             cola: this.colaActiva,
@@ -471,9 +567,8 @@ export class CombatEngine {
             objetivoId
         });
 
-        // 5. Destino de la carta jugada: PODER se consume, agotar/etérea va a agotadas, el resto va a descarte
         if (cartaData.tipo === "PODER") {
-            // Los poderes quedan activos como estado en la entidad y no van al descarte ni a agotadas
+            // Los poderes se consumen al jugarse
         } else if (cartaData.agotar || cartaData.eterea) {
             jugador.agotadasInterno.push(cartaId);
         } else {
@@ -502,6 +597,7 @@ export class CombatEngine {
         jugador.estados.clear();
         jugador.mano.clear();
         jugador.bloqueo = 0;
+        jugador.hpPerdidoCombate = 0;
         jugador.descarteInterno = [];
         jugador.agotadasInterno = [];
         jugador.pilaRoboInterna = [...jugador.mazoMaestro];
@@ -522,6 +618,13 @@ export class CombatEngine {
         accion.ejecutar();
     }
 
+    /**
+     * Ejecuta los efectos de cierre de turno del jugador:
+     * 1. Cartas en mano con efectosFinTurnoEnMano (Maldiciones).
+     * 2. Poder COMBUSTION (pierde 1 HP e inflige daño a todos los enemigos).
+     * 3. Estado FUERZA_TEMPORAL (pierde la Fuerza ganada por Flexión) y limpia SIN_ROBO.
+     * 4. Descarta la mano (agotando las cartas Etéreas y reteniendo las Eternas como Carnicería).
+     */
     public static descartarMano(jugador: PlayerState, state?: SpireState): void {
         if (state && jugador.hp > 0) {
             for (let i = 0; i < jugador.mano.length; i++) {
@@ -539,19 +642,57 @@ export class CombatEngine {
                     );
                 }
             }
+
+            // Poder COMBUSTION: pierde 1 HP y hace X de daño a todos los enemigos vivos
+            const danioCombustion = jugador.estados.get("COMBUSTION") || 0;
+            if (danioCombustion > 0 && jugador.hp > 0) {
+                this.colaActiva.encolarAlFinal(new AccionPerderHp(jugador, 1, jugador));
+                state.enemigos.forEach((enemigo) => {
+                    if (enemigo.hp > 0) {
+                        this.colaActiva.encolarAlFinal(
+                            new AccionAplicarDanio(
+                                jugador,
+                                enemigo,
+                                danioCombustion,
+                                "EFECTO_DIRECTO"
+                            )
+                        );
+                    }
+                });
+            }
+
+            // Expiración de FUERZA_TEMPORAL (Flexión) y SIN_ROBO (Trance de batalla)
+            const fuerzaTemp = jugador.estados.get("FUERZA_TEMPORAL") || 0;
+            if (fuerzaTemp > 0) {
+                jugador.estados.delete("FUERZA_TEMPORAL");
+                this.colaActiva.encolarAlFinal(
+                    new AccionAplicarEstado(jugador, "FUERZA", -fuerzaTemp)
+                );
+            }
+
+            if (jugador.estados.has("SIN_ROBO")) {
+                jugador.estados.delete("SIN_ROBO");
+            }
+
             this.procesarColaPendiente(state);
         }
 
+        const retenidasEnMano: string[] = [];
         while (jugador.mano.length > 0) {
-            const carta = jugador.mano.pop();
+            const carta = jugador.mano.shift();
             if (!carta) continue;
             const data = CATALOGO_CARTAS[carta];
             if (data?.eterea) {
                 jugador.agotadasInterno.push(carta);
+            } else if (data?.eterno) {
+                // Carnicería (eterno) permanece en la mano para el siguiente turno
+                retenidasEnMano.push(carta);
             } else {
                 jugador.descarteInterno.push(carta);
             }
         }
+
+        retenidasEnMano.forEach((cId) => jugador.mano.push(cId));
         this.actualizarContadoresMazo(jugador);
     }
 
@@ -566,7 +707,6 @@ export class CombatEngine {
     public static procesarInicioTurno(entidad: EntidadCombate, state?: SpireState): void {
         if (entidad.hp <= 0) return;
 
-        // 1. Veneno
         const veneno = entidad.estados.get("VENENO") || 0;
         if (veneno > 0) {
             if (veneno > 1) {
@@ -585,7 +725,6 @@ export class CombatEngine {
 
         if (entidad.hp <= 0) return;
 
-        // 2. Poder "El que no arriesga, no gana" (ARRIESGAR_GANAR)
         if (entidad instanceof PlayerState && state) {
             const oroPorTramo = entidad.estados.get("ARRIESGAR_GANAR") || 0;
             if (oroPorTramo > 0) {
@@ -667,6 +806,13 @@ export class CombatEngine {
     }
 
     private static mezclarArray(arr: string[]): void {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+
+    private static mezclarIndices(arr: number[]): void {
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [arr[i], arr[j]] = [arr[j], arr[i]];

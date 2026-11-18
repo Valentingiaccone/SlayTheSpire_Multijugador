@@ -13,6 +13,7 @@ import {
     EventoVisualCombate
 } from "../../compartido/GameTypes";
 import { CATALOGO_CARTAS } from "../../compartido/Cartas";
+import { CalculadoraCombate } from "../../compartido/CalculadoraCombate";
 import { CardView } from "./CardView";
 import { CombatEntityView } from "./CombatEntityView";
 import { CombatSequencer } from "./CombatSequencer";
@@ -36,7 +37,6 @@ export class CombatController extends Component {
     @property(Button) btnTerminarTurno: Button = null!;
     @property(Label) labelBtnTerminarTurno: Label = null!;
 
-    // Botones de Pilas de Combate (Descarte a la izquierda, Robo y Agotadas a la derecha)
     @property(Node) btnPilaDescarte: Node = null!;
     @property(Label) labelCantDescarte: Label = null!;
 
@@ -197,7 +197,6 @@ export class CombatController extends Component {
 
         const cantAgotadas = miJugador.cantAgotadas || 0;
         if (this.btnPilaAgotadas) {
-            // La pila de agotadas solo aparece en pantalla cuando hay al menos 1 carta agotada
             this.btnPilaAgotadas.active = cantAgotadas > 0;
         }
         if (this.labelCantAgotadas) {
@@ -212,6 +211,18 @@ export class CombatController extends Component {
             const nodo = instantiate(this.templateCarta);
             this.contenedorMano.addChild(nodo);
             this.nodosCartas.push(nodo);
+        }
+
+        // Calcular total de ataques en mano y si todas las cartas son de ataque (para Clash y Golpe perfecto)
+        let totalAtaquesEnMano = 0;
+        let todasSonAtaque = miJugador.mano.length > 0;
+        for (let i = 0; i < miJugador.mano.length; i++) {
+            const c = CATALOGO_CARTAS[miJugador.mano[i]];
+            if (c?.tipo === "ATAQUE") {
+                totalAtaquesEnMano++;
+            } else {
+                todasSonAtaque = false;
+            }
         }
 
         this.nodosCartas.forEach((nodo, i) => {
@@ -230,17 +241,32 @@ export class CombatController extends Component {
             nodo.active = true;
             const cardView = nodo.getComponent(CardView);
 
-            const alcanzaEnergia = miJugador.energia >= data.costo;
+            const costoReal = CalculadoraCombate.calcularCostoCarta(
+                data.costo,
+                data.reduccionCostoPorHpPerdido,
+                miJugador.hpPerdidoCombate || 0
+            );
+
+            const alcanzaEnergia = miJugador.energia >= costoReal;
             const alcanzaOro = !data.costoOro || miJugador.oro >= data.costoOro;
             const cumpleObjetivoAliado =
                 data.objetivoSeleccion !== "ALIADO" || hayOtroAliadoVivo;
+            const cumpleRequisitoClash =
+                !data.requiereManoSoloAtaques || todasSonAtaque;
 
             const puedePagarse =
                 !miJugador.turnoTerminado &&
                 !data.injugable &&
                 alcanzaEnergia &&
                 alcanzaOro &&
-                cumpleObjetivoAliado;
+                cumpleObjetivoAliado &&
+                cumpleRequisitoClash;
+
+            // Cuando se juega un ataque (ej. Golpe perfecto), ya salió de la mano, así que cuenta los demás ataques
+            const otrosAtaquesEnMano =
+                data.tipo === "ATAQUE"
+                    ? Math.max(0, totalAtaquesEnMano - 1)
+                    : totalAtaquesEnMano;
 
             cardView?.configurar(
                 i,
@@ -250,7 +276,12 @@ export class CombatController extends Component {
                 (tipo, touchPos) => this.detectarObjetivoBajoCursor(tipo, touchPos),
                 miJugador.estados,
                 (objetivoId) => this.datosEnemigosPorUid.get(objetivoId)?.estados,
-                puedePagarse
+                puedePagarse,
+                {
+                    bloqueoLanzador: miJugador.bloqueo,
+                    ataquesEnMano: otrosAtaquesEnMano,
+                    hpPerdidoCombate: miJugador.hpPerdidoCombate || 0
+                }
             );
         });
     }
@@ -260,7 +291,6 @@ export class CombatController extends Component {
         const mapaVistas = tipo === "ENEMIGO" ? this.vistasEnemigos : this.vistasAliados;
 
         for (const [id, vista] of mapaVistas.entries()) {
-            // Una carta de tipo "ALIADO" nunca puede apuntarse al propio jugador local
             if (tipo === "ALIADO" && id === miId) continue;
 
             if (vista.contienePuntoMundo(touchPos)) {
@@ -274,17 +304,14 @@ export class CombatController extends Component {
         NetworkManager.instance?.terminarTurno();
     }
 
-    // Asignar al Click Events del botón de Pila de Descarte (izquierda)
     public onClickAbrirPilaDescarte() {
         this.visorMazo?.abrirModoPilaCombate("DESCARTE");
     }
 
-    // Asignar al Click Events del botón de Pila de Robo (derecha)
     public onClickAbrirPilaRobo() {
         this.visorMazo?.abrirModoPilaCombate("ROBO");
     }
 
-    // Asignar al Click Events del botón de Pila de Agotadas (derecha, aparece al agotar cartas)
     public onClickAbrirPilaAgotadas() {
         this.visorMazo?.abrirModoPilaCombate("AGOTADAS");
     }

@@ -4,6 +4,12 @@ export interface IMapaEstadosLectura {
     get?(clave: string): number | undefined;
 }
 
+export interface IContextoCalculoCarta {
+    bloqueoLanzador?: number;
+    ataquesEnMano?: number;
+    hpPerdidoCombate?: number;
+}
+
 export interface IResultadoDescripcionDinamica {
     texto: string;
     estadoDanio: "NORMAL" | "AUMENTADO" | "REDUCIDO";
@@ -20,16 +26,23 @@ export class CalculadoraCombate {
         return typeof val === "number" ? val : 0;
     }
 
-    /**
-     * Calcula el daño real de un ataque considerando FUERZA y DEBIL del atacante,
-     * más VULNERABLE del defensor (si se está apuntando a un objetivo o si el enemigo nos ataca).
-     */
+    public static calcularCostoCarta(
+        costoBase: number,
+        reduccionPorHpPerdido?: boolean,
+        hpPerdidoCombate: number = 0
+    ): number {
+        if (!reduccionPorHpPerdido) return costoBase;
+        return Math.max(0, costoBase - Math.max(0, hpPerdidoCombate));
+    }
+
     public static calcularDanioAtaque(
         danioBase: number,
         estadosAtacante?: IMapaEstadosLectura,
-        estadosDefensor?: IMapaEstadosLectura
+        estadosDefensor?: IMapaEstadosLectura,
+        multiplicadorFuerza: number = 1
     ): number {
-        let monto = danioBase + this.leerEstado(estadosAtacante, "FUERZA");
+        const fuerza = this.leerEstado(estadosAtacante, "FUERZA") * multiplicadorFuerza;
+        let monto = danioBase + fuerza;
 
         if (this.leerEstado(estadosAtacante, "DEBIL") > 0) {
             monto = Math.floor(monto * 0.75);
@@ -42,9 +55,6 @@ export class CalculadoraCombate {
         return Math.max(0, monto);
     }
 
-    /**
-     * Calcula el bloqueo real de una carta.
-     */
     public static calcularBloqueo(
         bloqueoBase: number,
         _estadosLanzador?: IMapaEstadosLectura
@@ -52,14 +62,12 @@ export class CalculadoraCombate {
         return Math.max(0, bloqueoBase);
     }
 
-    /**
-     * Reemplaza los marcadores {D} y {B} de la descripción de una carta con los valores en tiempo real.
-     */
     public static formatearDescripcionCarta(
         descripcionBase: string,
         efectos: DescriptorEfecto[],
         estadosLanzador?: IMapaEstadosLectura,
-        estadosObjetivoApuntado?: IMapaEstadosLectura
+        estadosObjetivoApuntado?: IMapaEstadosLectura,
+        contextoExtra?: IContextoCalculoCarta
     ): IResultadoDescripcionDinamica {
         const efectoDanio = efectos.find((e) => e.tipo === "DANIO") as
             | Extract<DescriptorEfecto, { tipo: "DANIO" }>
@@ -73,16 +81,31 @@ export class CalculadoraCombate {
         let texto = descripcionBase;
 
         if (efectoDanio) {
-            const base = efectoDanio.valor;
+            let base = efectoDanio.danioIgualABloqueo
+                ? contextoExtra?.bloqueoLanzador ?? 0
+                : efectoDanio.valor;
+
+            if (efectoDanio.danioExtraPorAtaqueEnMano && contextoExtra?.ataquesEnMano !== undefined) {
+                base += contextoExtra.ataquesEnMano * efectoDanio.danioExtraPorAtaqueEnMano;
+            }
+
+            const multFuerza = efectoDanio.multiplicadorFuerza ?? 1;
             const calculado =
                 efectoDanio.fuente === "RELIQUIA"
                     ? base
-                    : this.calcularDanioAtaque(base, estadosLanzador, estadosObjetivoApuntado);
+                    : this.calcularDanioAtaque(
+                          base,
+                          estadosLanzador,
+                          estadosObjetivoApuntado,
+                          multFuerza
+                      );
 
-            if (calculado > base) estadoDanio = "AUMENTADO";
-            else if (calculado < base) estadoDanio = "REDUCIDO";
+            const referenciaOriginal = efectoDanio.danioIgualABloqueo ? 0 : efectoDanio.valor;
+            if (calculado > referenciaOriginal) estadoDanio = "AUMENTADO";
+            else if (calculado < referenciaOriginal) estadoDanio = "REDUCIDO";
 
-            const sufijo = calculado > base ? "▲" : calculado < base ? "▼" : "";
+            const sufijo =
+                calculado > referenciaOriginal ? "▲" : calculado < referenciaOriginal ? "▼" : "";
             texto = texto.replace(/\{D\}/g, `${calculado}${sufijo}`);
         }
 

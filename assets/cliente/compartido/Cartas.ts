@@ -1,6 +1,7 @@
 import { CARTAS_COMBATE } from "./AlmacenCartas/CartasCombate";
 import { CARTAS_VENENO } from "./AlmacenCartas/CartasVeneno";
 import { CARTAS_LADRON } from "./AlmacenCartas/CartasLadron";
+import { CARTAS_ASESINO } from "./AlmacenCartas/CartasAsesino";
 import { CARTAS_MALDICION } from "./AlmacenCartas/CartasMaldicion";
 import { ClaseId, PersonajeId, PERSONAJES_INFO } from "./GameTypes";
 import { DescriptorEfecto, EstadoId, IEfecto, TipoEfecto, TipoObjetivo } from "./CondicionesYEfectos";
@@ -23,6 +24,8 @@ export interface ICartaData {
     nombre: string;
     costo: number;
     costoOro?: number;
+    reduccionCostoPorHpPerdido?: boolean;
+    requiereManoSoloAtaques?: boolean;
     descripcion: string;
     sprite: string;
     clase: ClaseId;
@@ -35,10 +38,10 @@ export interface ICartaData {
     agotar?: boolean;
     injugable?: boolean;
     eterea?: boolean;
+    eterno?: boolean;
     efectos: DescriptorEfecto[];
     efectosFinTurnoEnMano?: DescriptorEfecto[];
     mejora?: IMejoraCartaConfig;
-    // Campos autogenerados al construir el catálogo:
     esMejorada?: boolean;
     idMejora?: string;
     idBase?: string;
@@ -56,6 +59,7 @@ const TODAS_LAS_CARTAS_BASE: ICartaData[] = [
     ...CARTAS_COMBATE,
     ...CARTAS_VENENO,
     ...CARTAS_LADRON,
+    ...CARTAS_ASESINO,
     ...CARTAS_MALDICION
 ];
 
@@ -146,20 +150,17 @@ function sortearCalidadPorContexto(contexto: ContextoGeneracionCartas): CalidadC
     const tirada = Math.random() * 100;
 
     if (contexto === "TIENDA") {
-        // 5% Legendaria, 20% Épica, 75% Común
         if (tirada < 5) return "LEGENDARIA";
         if (tirada < 25) return "EPICA";
         return "COMUN";
     }
 
     if (contexto === "ELITE") {
-        // Mayor probabilidad de raras tras vencer a un Élite
         if (tirada < 12) return "LEGENDARIA";
         if (tirada < 45) return "EPICA";
         return "COMUN";
     }
 
-    // COMBATE normal o EVENTO
     if (tirada < 3) return "LEGENDARIA";
     if (tirada < 23) return "EPICA";
     return "COMUN";
@@ -190,17 +191,14 @@ export function generarOpcionesRecompensa(
     for (let i = 0; i < cantidad; i++) {
         const calidadBuscada = sortearCalidadPorContexto(contexto);
 
-        // 1. Intentar con la calidad sorteada sin repetir carta
         let poolCalidad = candidatasValidas.filter(
             (c) => c.calidad === calidadBuscada && !usadas.has(c.id)
         );
 
-        // 2. Fallback si se agotaron las de esa calidad en esa clase
         if (poolCalidad.length === 0) {
             poolCalidad = candidatasValidas.filter((c) => !usadas.has(c.id));
         }
 
-        // 3. Fallback final permitiendo repetición si el catálogo de la clase es muy chico
         if (poolCalidad.length === 0) {
             poolCalidad = candidatasValidas;
         }

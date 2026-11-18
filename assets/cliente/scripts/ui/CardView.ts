@@ -1,6 +1,10 @@
 import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite, Color } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
-import { CalculadoraCombate, IMapaEstadosLectura } from "../../compartido/CalculadoraCombate";
+import {
+    CalculadoraCombate,
+    IContextoCalculoCarta,
+    IMapaEstadosLectura
+} from "../../compartido/CalculadoraCombate";
 import { SpriteManager } from "../utils/SpriteManager";
 
 const { ccclass, property } = _decorator;
@@ -20,6 +24,7 @@ export class CardView extends Component {
     private arrastreHabilitado: boolean = true;
 
     private estadosLanzadorActual: IMapaEstadosLectura | undefined = undefined;
+    private contextoExtraActual: IContextoCalculoCarta | undefined = undefined;
     private ultimoObjetivoHoverId: string | undefined = undefined;
 
     private onSolicitarJugar: ((indiceMano: number, objetivoId?: string) => void) | null = null;
@@ -45,12 +50,14 @@ export class CardView extends Component {
         buscarObjetivo: (tipo: "ENEMIGO" | "ALIADO", pos: Vec3) => string | undefined,
         estadosLanzador?: IMapaEstadosLectura,
         obtenerEstadosObjetivo?: (objetivoId: string) => IMapaEstadosLectura | undefined,
-        permitirArrastre: boolean = true
+        permitirArrastre: boolean = true,
+        contextoExtra?: IContextoCalculoCarta
     ) {
         this.indiceMano = indice;
         this.onSolicitarJugar = onJugar;
         this.buscarObjetivoEnPunto = buscarObjetivo;
         this.estadosLanzadorActual = estadosLanzador;
+        this.contextoExtraActual = contextoExtra;
         this.obtenerEstadosObjetivo = obtenerEstadosObjetivo || null;
         this.arrastreHabilitado = permitirArrastre && !data.injugable;
 
@@ -66,8 +73,18 @@ export class CardView extends Component {
         const cambioDeSprite = this.cartaData?.sprite !== data.sprite;
         this.cartaData = data;
 
+        const costoMostrado = CalculadoraCombate.calcularCostoCarta(
+            data.costo,
+            data.reduccionCostoPorHpPerdido,
+            contextoExtra?.hpPerdidoCombate || 0
+        );
+
         if (this.labelCosto) {
-            this.labelCosto.string = data.injugable ? "-" : `${data.costo}`;
+            this.labelCosto.string = data.injugable ? "-" : `${costoMostrado}`;
+            this.labelCosto.color =
+                costoMostrado < data.costo
+                    ? new Color(130, 255, 140)
+                    : new Color(255, 255, 255);
         }
 
         if (this.labelNombre) {
@@ -105,7 +122,8 @@ export class CardView extends Component {
             () => undefined,
             undefined,
             undefined,
-            false
+            false,
+            undefined
         );
         this.node.setScale(escala, escala, 1);
     }
@@ -117,7 +135,8 @@ export class CardView extends Component {
             this.cartaData.descripcion,
             this.cartaData.efectos,
             this.estadosLanzadorActual,
-            estadosObjetivo
+            estadosObjetivo,
+            this.contextoExtraActual
         );
 
         this.labelDescripcion.string = resultado.texto;
@@ -139,7 +158,7 @@ export class CardView extends Component {
     }
 
     private onTouchMove(event: EventTouch) {
-        if (!this.arrastreHabilitado || !this.arrastrando || !this.cartaData) return;
+        if (!this.arrastrando || !this.cartaData) return;
         const delta = event.getUIDelta();
         this.node.setPosition(this.node.position.x + delta.x, this.node.position.y + delta.y, 0);
 
@@ -161,7 +180,7 @@ export class CardView extends Component {
     }
 
     private onTouchEnd(event: EventTouch) {
-        if (!this.arrastreHabilitado || !this.arrastrando || !this.cartaData) return;
+        if (!this.arrastrando || !this.cartaData) return;
         this.arrastrando = false;
         this.ultimoObjetivoHoverId = undefined;
         this.refrescarTextoDinamico(undefined);

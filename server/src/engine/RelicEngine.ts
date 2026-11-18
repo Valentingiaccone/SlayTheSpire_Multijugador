@@ -35,6 +35,14 @@ export class RelicEngine {
             case "ORO_MINIMO":
                 return portador.oro >= condicion.minimo;
             case "TIENE_ESTADO": {
+                const min = condicion.minimo ?? 1;
+                if (condicion.objetivo === "ENEMIGO" && params.objetivoId) {
+                    const enemigoDirecto = state.enemigos.find((e) => e.uid === params.objetivoId);
+                    return Boolean(
+                        enemigoDirecto &&
+                            (enemigoDirecto.estados.get(condicion.estadoId) || 0) >= min
+                    );
+                }
                 const objetivos = CombatEngine.resolverObjetivos(
                     state,
                     portador,
@@ -42,7 +50,6 @@ export class RelicEngine {
                     params.objetivoId,
                     params.atacante
                 );
-                const min = condicion.minimo ?? 1;
                 return objetivos.some((obj) => (obj.estados.get(condicion.estadoId) || 0) >= min);
             }
             default:

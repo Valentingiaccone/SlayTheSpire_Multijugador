@@ -181,6 +181,7 @@ export interface IJugadorCliente {
     energiaMax: number;
     oro: number;
     oroRecompensa: number;
+    hpPerdidoCombate: number;
     turnoTerminado: boolean;
     nodoVotadoId: string;
     reliquiaCofreVotadaId: string;

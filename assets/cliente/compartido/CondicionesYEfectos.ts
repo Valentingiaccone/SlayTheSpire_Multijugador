@@ -1,11 +1,14 @@
 export type EstadoId =
     | "FUERZA"
+    | "FUERZA_TEMPORAL"
     | "VULNERABLE"
     | "DEBIL"
     | "ESPINAS"
     | "VENENO"
     | "AVARICIA"
-    | "ARRIESGAR_GANAR";
+    | "ARRIESGAR_GANAR"
+    | "SIN_ROBO"
+    | "COMBUSTION";
 
 export type TipoObjetivo =
     | "PROPIO"
@@ -43,6 +46,9 @@ export type DescriptorEfecto =
           fuente?: FuenteDanio;
           oroPorGolpeAlHp?: number;
           oroSiMata?: number;
+          multiplicadorFuerza?: number;
+          danioIgualABloqueo?: boolean;
+          danioExtraPorAtaqueEnMano?: number;
       }
     | {
           tipo: "BLOQUEO";
@@ -114,6 +120,19 @@ export type DescriptorEfecto =
     | {
           tipo: "BLOQUEO_POR_ORO_GASTADO";
           maximoOro: number;
+      }
+    | {
+          tipo: "COPIAR_CARTA_A_DESCARTE";
+          cartaId: string;
+          cantidad?: number;
+      }
+    | {
+          tipo: "MEJORAR_CARTAS_MANO";
+          cantidad: number | "TODAS";
+      }
+    | {
+          tipo: "AGOTAR_CARTA_MANO_AZAR";
+          cantidad: number;
       }
     | {
           tipo: "CONDICIONAL";

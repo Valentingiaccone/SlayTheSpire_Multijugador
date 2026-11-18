@@ -12,6 +12,7 @@ export function obtenerIdEntidad(entidad: EntidadCombate): string {
 export interface IOpcionesExtraDanio {
     oroPorGolpeAlHp?: number;
     oroSiMata?: number;
+    multiplicadorFuerza?: number;
 }
 
 export class AccionModificarOro implements IAccionCombate {
@@ -59,8 +60,9 @@ export class AccionPerderHp implements IAccionCombate {
             fuente: "EFECTO_DIRECTO"
         });
 
-        // Poder AVARICIA: Gana X de oro por cada punto de HP que pierdas
         if (this.objetivo instanceof PlayerState && perdidoReal > 0) {
+            this.objetivo.hpPerdidoCombate += perdidoReal;
+
             const avaricia = this.objetivo.estados.get("AVARICIA") || 0;
             if (avaricia > 0) {
                 cola.encolarAlInicio(new AccionModificarOro(this.objetivo, perdidoReal * avaricia));
@@ -92,12 +94,14 @@ export class AccionAplicarDanio implements IAccionCombate {
             return;
         }
 
+        const multFuerza = this.extra.multiplicadorFuerza ?? 1;
         const monto =
             this.fuente === "ATAQUE_CARTA" || this.fuente === "ATAQUE_ENEMIGO"
                 ? CalculadoraCombate.calcularDanioAtaque(
                       this.danioBase,
                       this.atacante?.estados,
-                      this.defensor.estados
+                      this.defensor.estados,
+                      multFuerza
                   )
                 : Math.max(0, this.danioBase);
 
@@ -121,8 +125,9 @@ export class AccionAplicarDanio implements IAccionCombate {
             fuente: this.fuente
         });
 
-        // Poder AVARICIA: se dispara siempre que el jugador pierda HP real
         if (this.defensor instanceof PlayerState && hpPerdidoReal > 0) {
+            this.defensor.hpPerdidoCombate += hpPerdidoReal;
+
             const avaricia = this.defensor.estados.get("AVARICIA") || 0;
             if (avaricia > 0) {
                 cola.encolarAlInicio(
@@ -131,7 +136,6 @@ export class AccionAplicarDanio implements IAccionCombate {
             }
         }
 
-        // Bonificaciones de cartas de Ladrón al golpear HP o matar a un enemigo
         if (this.atacante instanceof PlayerState && this.defensor instanceof EnemyState) {
             if (hpPerdidoReal > 0 && this.extra.oroPorGolpeAlHp && this.extra.oroPorGolpeAlHp > 0) {
                 cola.encolarAlInicio(
@@ -220,7 +224,12 @@ export class AccionAplicarEstado implements IAccionCombate {
         if (this.objetivo.hp <= 0 || this.valor === 0) return;
         const actual = this.objetivo.estados.get(this.estadoId) || 0;
         const nuevoTotal = actual + this.valor;
-        this.objetivo.estados.set(this.estadoId, nuevoTotal);
+
+        if (nuevoTotal === 0) {
+            this.objetivo.estados.delete(this.estadoId);
+        } else {
+            this.objetivo.estados.set(this.estadoId, nuevoTotal);
+        }
 
         cola.emitirVisual({
             tipo: "ESTADO_APLICADO",
@@ -271,6 +280,8 @@ export class AccionRobarCartas implements IAccionCombate {
 
     ejecutar(): void {
         if (this.jugador.hp <= 0 || this.cantidad <= 0) return;
+        // Si tiene el estado SIN_ROBO (por Trance de batalla), no puede robar cartas este turno
+        if ((this.jugador.estados.get("SIN_ROBO") || 0) > 0) return;
 
         for (let i = 0; i < this.cantidad; i++) {
             if (this.jugador.mano.length >= 10) break;

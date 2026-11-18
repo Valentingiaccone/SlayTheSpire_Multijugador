@@ -45,32 +45,29 @@ export class PlayerState extends Schema {
     @type("number") energia: number = 3;
     @type("number") energiaMax: number = 3;
     @type("number") oro: number = ECONOMIA_CONFIG.ORO_INICIAL;
+    @type("number") hpPerdidoCombate: number = 0;
 
     @type("boolean") turnoTerminado: boolean = false;
     @type("string") nodoVotadoId: string = "";
     @type("string") reliquiaCofreVotadaId: string = "";
 
-    // Recompensas post-combate
     @type("boolean") recompensaElegida: boolean = false;
     @type(["string"]) opcionesRecompensa = new ArraySchema<string>();
     @type("string") reliquiaRecompensa: string = "";
     @type("number") oroRecompensa: number = 0;
 
-    // Fogata y Tienda
     @type("boolean") fogataCompletada: boolean = false;
     @type("boolean") tiendaCompletada: boolean = false;
     @type("boolean") tiendaEliminacionUsada: boolean = false;
     @type(["string"]) tiendaCartas = new ArraySchema<string>();
     @type(["string"]) tiendaReliquias = new ArraySchema<string>();
 
-    // Eventos "?"
     @type("boolean") eventoCompletado: boolean = false;
     @type("number") eventoVotoOpcion: number = -1;
     @type(["string"]) eventoOpcionCartas = new ArraySchema<string>();
     @type(["string"]) eventoOpcionReliquias = new ArraySchema<string>();
     @type(["string"]) eventoOpcionMaldiciones = new ArraySchema<string>();
 
-    // Cartas, Pilas de Combate y Reliquias
     @type(["string"]) mano = new ArraySchema<string>();
     @type(["string"]) mazoMaestro = new ArraySchema<string>();
     @type(["string"]) pilaRobo = new ArraySchema<string>();
@@ -83,7 +80,6 @@ export class PlayerState extends Schema {
     @type("number") cantDescarte: number = 0;
     @type("number") cantAgotadas: number = 0;
 
-    // Variables internas de servidor
     pilaRoboInterna: string[] = [];
     descarteInterno: string[] = [];
     agotadasInterno: string[] = [];
