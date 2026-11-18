@@ -23,6 +23,7 @@ export class MapService {
             nodoSchema.piso = d.piso;
             nodoSchema.columna = d.columna;
             nodoSchema.tipo = d.tipo;
+            nodoSchema.tipoRealOculto = d.tipoRealOculto;
             nodoSchema.estado = d.estado;
             d.siguientesIds.forEach((sigId) => nodoSchema.siguientesIds.push(sigId));
             this.state.nodosMapa.push(nodoSchema);
@@ -145,6 +146,12 @@ export class MapService {
             if (n.estado === "ACTUAL") n.estado = "COMPLETADO";
             else if (n.estado === "DISPONIBLE" && n.id !== nodoElegido.id) n.estado = "BLOQUEADO";
         });
+
+        // Si era un interrogante falso, revelamos su tipo real al llegar
+        if (nodoElegido.tipoRealOculto) {
+            nodoElegido.tipo = nodoElegido.tipoRealOculto;
+            nodoElegido.tipoRealOculto = undefined;
+        }
 
         nodoElegido.estado = "ACTUAL";
         this.state.nodoActualId = nodoElegido.id;

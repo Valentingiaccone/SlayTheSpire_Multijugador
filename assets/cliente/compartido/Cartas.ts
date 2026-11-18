@@ -1,5 +1,6 @@
 import { CARTAS_COMBATE } from "./AlmacenCartas/CartasCombate";
 import { CARTAS_VENENO } from "./AlmacenCartas/CartasVeneno";
+import { CARTAS_MALDICION } from "./AlmacenCartas/CartasMaldicion";
 import { ClaseId, PersonajeId, PERSONAJES_INFO } from "./GameTypes";
 import { DescriptorEfecto, EstadoId, IEfecto, TipoEfecto, TipoObjetivo } from "./CondicionesYEfectos";
 
@@ -24,7 +25,10 @@ export interface ICartaData {
     enPoolRecompensa: boolean;
     precioTienda?: number;
     objetivoSeleccion?: "ENEMIGO" | "ALIADO";
+    injugable?: boolean;
+    eterea?: boolean;
     efectos: DescriptorEfecto[];
+    efectosFinTurnoEnMano?: DescriptorEfecto[];
     mejora?: IMejoraCartaConfig;
     // Campos autogenerados al construir el catálogo:
     esMejorada?: boolean;
@@ -34,7 +38,8 @@ export interface ICartaData {
 
 const TODAS_LAS_CARTAS_BASE: ICartaData[] = [
     ...CARTAS_COMBATE,
-    ...CARTAS_VENENO
+    ...CARTAS_VENENO,
+    ...CARTAS_MALDICION
 ];
 
 export const CATALOGO_CARTAS: Record<string, ICartaData> = {};
@@ -96,6 +101,12 @@ export function obtenerMazoInicial(personajeId: string): string[] {
     return info ? [...info.mazoInicial] : [];
 }
 
+export function obtenerMaldicionAleatoria(): string {
+    if (CARTAS_MALDICION.length === 0) return "maldicion_herida";
+    const idx = Math.floor(Math.random() * CARTAS_MALDICION.length);
+    return CARTAS_MALDICION[idx].id;
+}
+
 export function generarOpcionesRecompensa(personajeId: PersonajeId, cantidad = 3): string[] {
     const infoPersonaje = PERSONAJES_INFO[personajeId];
     const clasesPermitidas: string[] = infoPersonaje ? [...infoPersonaje.clases] : ["combate"];
@@ -104,6 +115,7 @@ export function generarOpcionesRecompensa(personajeId: PersonajeId, cantidad = 3
         .filter((carta) =>
             carta.enPoolRecompensa !== false &&
             !carta.esMejorada &&
+            carta.tipo !== "MALDICION" &&
             clasesPermitidas.includes(carta.clase)
         )
         .map((carta) => carta.id);

@@ -10,6 +10,7 @@ export type FaseSala =
     | "CHEST"
     | "CAMPFIRE"
     | "SHOP"
+    | "EVENT"
     | "VICTORY"
     | "DEFEAT";
 
@@ -27,6 +28,8 @@ export const MENSAJES = {
     COMPRAR_RELIQUIA_TIENDA: "comprar_reliquia_tienda",
     ELIMINAR_CARTA_TIENDA: "eliminar_carta_tienda",
     SALIR_TIENDA: "salir_tienda",
+    ACCION_EVENTO: "accion_evento",
+    VOTAR_OPCION_EVENTO: "votar_opcion_evento",
     REINICIAR_PARTIDA: "reiniciar_partida",
     SECUENCIA_COMBATE: "secuencia_combate"
 } as const;
@@ -44,6 +47,11 @@ export type TipoAccionFogata =
     | { tipo: "CURAR_PROPIO" }
     | { tipo: "CURAR_ALIADO"; aliadoSessionId: string }
     | { tipo: "MEJORAR_CARTA"; indiceMazo: number };
+
+export interface IPayloadAccionEvento {
+    indiceOpcion: number;
+    indiceCartaEliminar?: number;
+}
 
 export type PersonajeId = "SHELLY" | "CROW";
 export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow" | "maldicion";
@@ -175,6 +183,8 @@ export interface IJugadorCliente {
     fogataCompletada: boolean;
     tiendaCompletada: boolean;
     tiendaEliminacionUsada: boolean;
+    eventoCompletado: boolean;
+    eventoVotoOpcion: number;
     cantPilaRobo: number;
     cantDescarte: number;
     mano: Iterable<string> & { length: number; [index: number]: string };
@@ -183,6 +193,9 @@ export interface IJugadorCliente {
     reliquias: Iterable<string> & { length: number; [index: number]: string };
     tiendaCartas: Iterable<string> & { length: number; [index: number]: string };
     tiendaReliquias: Iterable<string> & { length: number; [index: number]: string };
+    eventoOpcionCartas: Iterable<string> & { length: number; [index: number]: string };
+    eventoOpcionReliquias: Iterable<string> & { length: number; [index: number]: string };
+    eventoOpcionMaldiciones: Iterable<string> & { length: number; [index: number]: string };
     estados: IMapaEstadosCliente;
 }
 
@@ -221,6 +234,10 @@ export interface IEstadoSalaCliente {
     hayConflictoCofre: boolean;
     tiempoCuentaRegresivaCofre: number;
     reliquiasCofre: Iterable<string>;
+    eventoActualId: string;
+    hayEmpateEvento: boolean;
+    opcionGanadoraEventoIdx: number;
+    tiempoCuentaRegresivaEvento: number;
     jugadores: {
         get(sessionId: string): IJugadorCliente | undefined;
         forEach(cb: (jugador: IJugadorCliente, sessionId: string) => void): void;

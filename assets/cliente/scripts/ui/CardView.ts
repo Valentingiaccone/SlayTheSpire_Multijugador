@@ -37,9 +37,6 @@ export class CardView extends Component {
         this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
     }
 
-    /**
-     * Configuración para cartas en la mano durante el combate (con drag & drop y cálculo dinámico).
-     */
     public configurar(
         indice: number,
         data: ICartaData,
@@ -55,7 +52,7 @@ export class CardView extends Component {
         this.buscarObjetivoEnPunto = buscarObjetivo;
         this.estadosLanzadorActual = estadosLanzador;
         this.obtenerEstadosObjetivo = obtenerEstadosObjetivo || null;
-        this.arrastreHabilitado = permitirArrastre;
+        this.arrastreHabilitado = permitirArrastre && !data.injugable;
 
         if (this.arrastrando && this.cartaData?.id === data.id) {
             this.refrescarTextoDinamico(
@@ -69,18 +66,27 @@ export class CardView extends Component {
         const cambioDeSprite = this.cartaData?.sprite !== data.sprite;
         this.cartaData = data;
 
-        if (this.labelCosto) this.labelCosto.string = `${data.costo}`;
+        if (this.labelCosto) {
+            this.labelCosto.string = data.injugable ? "-" : `${data.costo}`;
+        }
+
         if (this.labelNombre) {
             this.labelNombre.string = data.nombre;
-            this.labelNombre.color = data.esMejorada
-                ? new Color(130, 255, 140)
-                : new Color(255, 255, 255);
+            if (data.tipo === "MALDICION") {
+                this.labelNombre.color = new Color(215, 120, 255);
+            } else if (data.esMejorada) {
+                this.labelNombre.color = new Color(130, 255, 140);
+            } else {
+                this.labelNombre.color = new Color(255, 255, 255);
+            }
         }
+
         if (this.labelTipo) this.labelTipo.string = data.tipo;
 
         this.refrescarTextoDinamico(undefined);
 
-        const escala = puedePagarse ? 1 : 0.92;
+        const jugableVisual = puedePagarse && !data.injugable;
+        const escala = jugableVisual ? 1 : 0.92;
         this.node.setScale(escala, escala, 1);
 
         if (cambioDeSprite) {
@@ -88,13 +94,9 @@ export class CardView extends Component {
         }
     }
 
-    /**
-     * Configuración para mostrar la carta en menús (Visor de Mazo, Forja, Tienda, Recompensas)
-     * desactivando el arrastre para permitir el scroll vertical y los clics de selección.
-     */
     public configurarModoEstatico(data: ICartaData, escala: number = 1) {
         this.arrastrando = false;
-        this.ulpimoHoverReset();
+        this.ultimoObjetivoHoverId = undefined;
         this.configurar(
             -1,
             data,
@@ -106,10 +108,6 @@ export class CardView extends Component {
             false
         );
         this.node.setScale(escala, escala, 1);
-    }
-
-    private ulpimoHoverReset() {
-        this.ultimoObjetivoHoverId = undefined;
     }
 
     private refrescarTextoDinamico(estadosObjetivo?: IMapaEstadosLectura) {
@@ -145,7 +143,6 @@ export class CardView extends Component {
         const delta = event.getUIDelta();
         this.node.setPosition(this.node.position.x + delta.x, this.node.position.y + delta.y, 0);
 
-        // Si la carta apunta a un enemigo o ataca enemigos, recalculamos en vivo al pasar sobre uno
         if (this.buscarObjetivoEnPunto && this.obtenerEstadosObjetivo) {
             const uiPos = event.getUILocation();
             const enemigoBajoCursorId = this.buscarObjetivoEnPunto(

@@ -5,7 +5,8 @@ import {
     PersonajeId,
     PERSONAJES_INFO,
     EventoVisualCombate,
-    TipoAccionFogata
+    TipoAccionFogata,
+    IPayloadAccionEvento
 } from "../../../assets/cliente/compartido/GameTypes";
 import { obtenerMazoInicial } from "../../../assets/cliente/compartido/Cartas";
 import { TipoNodoMapa } from "../../../assets/cliente/compartido/Mapa";
@@ -14,6 +15,7 @@ import { ChestService } from "./services/ChestService";
 import { RewardService } from "./services/RewardService";
 import { CampfireService } from "./services/CampfireService";
 import { ShopService } from "./services/ShopService";
+import { EventService } from "./services/EventService";
 import { CombatCoordinator } from "./services/CombatCoordinator";
 
 export class SpireRoom extends Room<SpireState> {
@@ -24,6 +26,7 @@ export class SpireRoom extends Room<SpireState> {
     private rewardService!: RewardService;
     private campfireService!: CampfireService;
     private shopService!: ShopService;
+    private eventService!: EventService;
     private combatCoordinator!: CombatCoordinator;
 
     onCreate(): void {
@@ -41,6 +44,7 @@ export class SpireRoom extends Room<SpireState> {
         this.rewardService = new RewardService(this.state, avanzarAlMapa);
         this.campfireService = new CampfireService(this.state, avanzarAlMapa);
         this.shopService = new ShopService(this.state, avanzarAlMapa);
+        this.eventService = new EventService(this.state, this.clock, avanzarAlMapa);
 
         this.combatCoordinator = new CombatCoordinator(
             this.state,
@@ -70,6 +74,7 @@ export class SpireRoom extends Room<SpireState> {
         if (this.state.jugadores.size === 0) {
             this.mapService.cancelarCuentaRegresiva();
             this.chestService.cancelarCuentaRegresiva();
+            this.eventService.cancelarCuentaRegresiva();
             return;
         }
 
@@ -94,6 +99,9 @@ export class SpireRoom extends Room<SpireState> {
                 break;
             case "SHOP":
                 this.shopService.verificarFinTienda();
+                break;
+            case "EVENT":
+                this.eventService.verificarFinEvento();
                 break;
         }
     }
@@ -177,7 +185,50 @@ export class SpireRoom extends Room<SpireState> {
             this.shopService.salirTienda(client.sessionId);
         });
 
-        // ================= ATAJOS DE DESARROLLO LOCAL (SOLO PARA TESTEO) =================
+        this.onMessage(MENSAJES.ACCION_EVENTO, (client, data: IPayloadAccionEvento) => {
+            this.eventService.procesarAccionIndividual(client.sessionId, data);
+        });
+
+        this.onMessage(MENSAJES.VOTAR_OPCION_EVENTO, (client, data: { indiceOpcion: number }) => {
+            if (typeof data?.indiceOpcion !== "number") return;
+            this.eventService.registrarVotoComunitario(client.sessionId, data.indiceOpcion);
+        });
+
+        this.onMessage(MENSAJES.REINICIAR_PARTIDA, (client) => {
+            if (!this.state.jugadores.has(client.sessionId)) return;
+            if (this.state.faseActual !== "VICTORY" && this.state.faseActual !== "DEFEAT") return;
+
+            this.mapService.cancelarCuentaRegresiva();
+            this.chestService.cancelarCuentaRegresiva();
+            this.eventService.cancelarCuentaRegresiva();
+            this.state.pisoActual = 1;
+            this.state.turnoNumero = 1;
+            this.state.nodoActualId = "";
+            this.state.nodosMapa.clear();
+            this.state.enemigos.clear();
+
+            this.state.jugadores.forEach((j) => {
+                j.listo = false;
+                j.nodoVotadoId = "";
+                j.reliquiaCofreVotadaId = "";
+                j.fogataCompletada = false;
+                j.tiendaCompletada = false;
+                j.tiendaEliminacionUsada = false;
+                j.eventoCompletado = false;
+                j.eventoVotoOpcion = -1;
+                j.tiendaCartas.clear();
+                j.tiendaReliquias.clear();
+                j.eventoOpcionCartas.clear();
+                j.eventoOpcionReliquias.clear();
+                j.eventoOpcionMaldiciones.clear();
+                j.reliquias.clear();
+                j.aplicarDatosPersonaje(j.personajeId);
+            });
+
+            this.state.faseActual = "LOBBY";
+        });
+
+        // Atajos de teclado para testeo local rápido (Teclas 1 a 6)
         this.onMessage("debug_comando", (client, data: { accion: string }) => {
             const jugador = this.state.jugadores.get(client.sessionId);
             if (!jugador || !data?.accion) return;
@@ -207,35 +258,10 @@ export class SpireRoom extends Room<SpireState> {
                     jugador.oro += 100;
                     jugador.estados.set("FUERZA", (jugador.estados.get("FUERZA") || 0) + 10);
                     break;
+                case "IR_EVENTO":
+                    this.eventService.iniciarEventoAleatorio();
+                    break;
             }
-        });
-
-        this.onMessage(MENSAJES.REINICIAR_PARTIDA, (client) => {
-            if (!this.state.jugadores.has(client.sessionId)) return;
-            if (this.state.faseActual !== "VICTORY" && this.state.faseActual !== "DEFEAT") return;
-
-            this.mapService.cancelarCuentaRegresiva();
-            this.chestService.cancelarCuentaRegresiva();
-            this.state.pisoActual = 1;
-            this.state.turnoNumero = 1;
-            this.state.nodoActualId = "";
-            this.state.nodosMapa.clear();
-            this.state.enemigos.clear();
-
-            this.state.jugadores.forEach((j) => {
-                j.listo = false;
-                j.nodoVotadoId = "";
-                j.reliquiaCofreVotadaId = "";
-                j.fogataCompletada = false;
-                j.tiendaCompletada = false;
-                j.tiendaEliminacionUsada = false;
-                j.tiendaCartas.clear();
-                j.tiendaReliquias.clear();
-                j.reliquias.clear();
-                j.aplicarDatosPersonaje(j.personajeId);
-            });
-
-            this.state.faseActual = "LOBBY";
         });
     }
 
@@ -280,6 +306,9 @@ export class SpireRoom extends Room<SpireState> {
                 break;
             case "TIENDA":
                 this.shopService.iniciarEventoTienda();
+                break;
+            case "EVENTO":
+                this.eventService.iniciarEventoAleatorio();
                 break;
             case "COMBATE":
             default:

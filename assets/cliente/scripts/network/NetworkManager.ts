@@ -36,7 +36,7 @@ export class NetworkManager extends Component {
             const Colyseus = (window as any).Colyseus;
             const urlServidor = this.usarServidorLocal
                 ? "ws://localhost:2567"
-                : "[https://slaythespire-multijugador.onrender.com](https://slaythespire-multijugador.onrender.com)";
+                : "https://slaythespire-multijugador.onrender.com";
 
             this.client = new Colyseus.Client(urlServidor);
             this.room = await this.client.joinOrCreate("spire_room", {
@@ -106,6 +106,14 @@ export class NetworkManager extends Component {
 
     public salirTienda() {
         this.room?.send(MENSAJES.SALIR_TIENDA);
+    }
+
+    public enviarAccionEvento(indiceOpcion: number, indiceCartaEliminar?: number) {
+        this.room?.send(MENSAJES.ACCION_EVENTO, { indiceOpcion, indiceCartaEliminar });
+    }
+
+    public votarOpcionEvento(indiceOpcion: number) {
+        this.room?.send(MENSAJES.VOTAR_OPCION_EVENTO, { indiceOpcion });
     }
 
     public reiniciarPartida() {

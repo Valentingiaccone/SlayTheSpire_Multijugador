@@ -104,7 +104,6 @@ export class CombatEngine {
         return nuevos;
     }
 
-    /** Devuelve y limpia todos los eventos visuales acumulados para emitirlos a los clientes */
     public static consumirEventosVisuales(): EventoVisualCombate[] {
         const copia = [...this.bufferVisualSala];
         this.bufferVisualSala = [];
@@ -167,8 +166,6 @@ export class CombatEngine {
                     const fuente = efecto.fuente || fuentePorDefecto;
 
                     for (let hit = 1; hit <= golpes; hit++) {
-                        // Resolvemos el objetivo dentro de una acción diferida para que ENEMIGO_ALEATORIO
-                        // elija un nuevo enemigo vivo en cada impacto del boomerang
                         cola.encolarAlFinal({
                             ejecutar: (st, q) => {
                                 const objetivos = this.resolverObjetivos(
@@ -180,13 +177,15 @@ export class CombatEngine {
                                 );
                                 for (const obj of objetivos) {
                                     const objId = obj instanceof PlayerState ? obj.sessionId : obj.uid;
-                                    q.emitirVisual({
-                                        tipo: "ATAQUE_EJECUTADO",
-                                        atacanteId: lanzador.sessionId,
-                                        objetivoId: objId,
-                                        indiceGolpe: hit,
-                                        totalGolpes: golpes
-                                    });
+                                    if (fuente === "ATAQUE_CARTA") {
+                                        q.emitirVisual({
+                                            tipo: "ATAQUE_EJECUTADO",
+                                            atacanteId: lanzador.sessionId,
+                                            objetivoId: objId,
+                                            indiceGolpe: hit,
+                                            totalGolpes: golpes
+                                        });
+                                    }
                                     q.encolarAlInicio(new AccionAplicarDanio(lanzador, obj, efecto.valor, fuente));
                                 }
                             }
@@ -274,7 +273,7 @@ export class CombatEngine {
 
         const cartaId = jugador.mano[indiceMano];
         const cartaData = CATALOGO_CARTAS[cartaId];
-        if (!cartaData || jugador.energia < cartaData.costo) return false;
+        if (!cartaData || cartaData.injugable || jugador.energia < cartaData.costo) return false;
 
         if (cartaData.objetivoSeleccion === "ENEMIGO") {
             const existeEnemigoVivo = state.enemigos.some((e) => e.uid === objetivoId && e.hp > 0);
@@ -284,11 +283,9 @@ export class CombatEngine {
             if (!aliado || aliado.hp <= 0) return false;
         }
 
-        // 1. Cobrar energía y retirar de la mano
         jugador.energia -= cartaData.costo;
         jugador.mano.splice(indiceMano, 1);
 
-        // 2. Actualizar contadores de turno/combate
         jugador.cartasJugadasTurno += 1;
         jugador.cartasJugadasCombate += 1;
         if (cartaData.tipo === "ATAQUE") {
@@ -302,10 +299,8 @@ export class CombatEngine {
             objetivoId
         });
 
-        // 3. Encolar los efectos de la carta
         this.encolarEfectos(state, this.colaActiva, jugador, cartaData.efectos, objetivoId, undefined, "ATAQUE_CARTA");
 
-        // 4. Emitir evento AL_JUGAR_CARTA al bus
         this.busEventos.emitir("AL_JUGAR_CARTA", {
             state,
             cola: this.colaActiva,
@@ -314,8 +309,9 @@ export class CombatEngine {
             objetivoId
         });
 
-        // 5. Mandar al descarte y procesar toda la cola de reacciones
-        jugador.descarteInterno.push(cartaId);
+        if (!cartaData.eterea) {
+            jugador.descarteInterno.push(cartaId);
+        }
         this.actualizarContadoresMazo(jugador);
         this.colaActiva.encolarAlFinal(new AccionVerificarFinCombate());
         this.procesarColaPendiente(state);
@@ -357,10 +353,38 @@ export class CombatEngine {
         accion.ejecutar();
     }
 
-    public static descartarMano(jugador: PlayerState): void {
+    /**
+     * Procesa los efectos de fin de turno de las cartas que quedaron en mano (ej. Maldiciones)
+     * y descarta la mano (agotando las cartas Etéreas).
+     */
+    public static descartarMano(jugador: PlayerState, state?: SpireState): void {
+        if (state && jugador.hp > 0) {
+            for (let i = 0; i < jugador.mano.length; i++) {
+                const cartaId = jugador.mano[i];
+                const data = CATALOGO_CARTAS[cartaId];
+                if (data?.efectosFinTurnoEnMano && data.efectosFinTurnoEnMano.length > 0) {
+                    this.encolarEfectos(
+                        state,
+                        this.colaActiva,
+                        jugador,
+                        data.efectosFinTurnoEnMano,
+                        undefined,
+                        undefined,
+                        "EFECTO_DIRECTO"
+                    );
+                }
+            }
+            this.procesarColaPendiente(state);
+        }
+
         while (jugador.mano.length > 0) {
             const carta = jugador.mano.pop();
-            if (carta) jugador.descarteInterno.push(carta);
+            if (!carta) continue;
+            const data = CATALOGO_CARTAS[carta];
+            // Si la carta es Etérea (ej. Torpeza), se agota y NO va al descarte
+            if (!data?.eterea) {
+                jugador.descarteInterno.push(carta);
+            }
         }
         this.actualizarContadoresMazo(jugador);
     }
@@ -400,12 +424,10 @@ export class CombatEngine {
             enemigo.bloqueo = 0;
             this.procesarInicioTurno(enemigo, state);
 
-            // Si murió por veneno al empezar su turno, no actúa
             if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
 
             if (enemigo.intencionTipo === "ATACAR") {
                 state.jugadores.forEach((jugador) => {
-                    // Verificamos enemigo.hp > 0 en cada paso por si murió con las ESPINAS del jugador anterior
                     if (enemigo.hp > 0 && jugador.hp > 0 && state.faseActual === "COMBAT") {
                         this.colaActiva.emitirVisual({
                             tipo: "ATAQUE_EJECUTADO",

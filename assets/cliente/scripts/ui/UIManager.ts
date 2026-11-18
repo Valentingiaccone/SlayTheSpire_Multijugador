@@ -1,3 +1,4 @@
+import { _decorator, Component, Node, Label, input, Input, EventKeyboard, KeyCode } from "cc";
 import {
     NetworkManager,
     NetworkEvents,
@@ -6,7 +7,6 @@ import {
 } from "../network/NetworkManager";
 import { FaseSala, IEstadoSalaCliente, EventoVisualCombate } from "../../compartido/GameTypes";
 import { DeckViewerController } from "./DeckViewerController";
-import { _decorator, Component, Node, Label, input, Input, EventKeyboard, KeyCode } from "cc";
 
 const { ccclass, property } = _decorator;
 
@@ -19,6 +19,7 @@ export class UIManager extends Component {
     @property(Node) panelCofre: Node = null!;
     @property(Node) panelFogata: Node = null!;
     @property(Node) panelTienda: Node = null!;
+    @property(Node) panelEvento: Node = null!;
     @property(Node) panelFinPartida: Node = null!;
     @property(Label) labelFinPartida: Label = null!;
 
@@ -36,6 +37,20 @@ export class UIManager extends Component {
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoActualizado, this);
         NetworkEvents.on(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
         input.on(Input.EventType.KEY_DOWN, this.onTeclaDebugPresionada, this);
+    }
+
+    async start() {
+        const nombreRandom = "Jugador_" + Math.floor(Math.random() * 100);
+        await NetworkManager.instance?.conectarYSala(nombreRandom);
+    }
+
+    onDestroy() {
+        NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoActualizado, this);
+        NetworkEvents.off(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
+        input.off(Input.EventType.KEY_DOWN, this.onTeclaDebugPresionada, this);
+        if (this.timerTransicionFase) {
+            clearTimeout(this.timerTransicionFase);
+        }
     }
 
     private onTeclaDebugPresionada(event: EventKeyboard) {
@@ -58,19 +73,9 @@ export class UIManager extends Component {
             case KeyCode.DIGIT_5:
                 room.send("debug_comando", { accion: "BUFF_TEST" });
                 break;
-        }
-    }
-
-    async start() {
-        const nombreRandom = "Jugador_" + Math.floor(Math.random() * 100);
-        await NetworkManager.instance?.conectarYSala(nombreRandom);
-    }
-
-    onDestroy() {
-        NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoActualizado, this);
-        NetworkEvents.off(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
-        if (this.timerTransicionFase) {
-            clearTimeout(this.timerTransicionFase);
+            case KeyCode.DIGIT_6:
+                room.send("debug_comando", { accion: "IR_EVENTO" });
+                break;
         }
     }
 
@@ -121,6 +126,7 @@ export class UIManager extends Component {
         if (this.panelCofre) this.panelCofre.active = fase === "CHEST";
         if (this.panelFogata) this.panelFogata.active = fase === "CAMPFIRE";
         if (this.panelTienda) this.panelTienda.active = fase === "SHOP";
+        if (this.panelEvento) this.panelEvento.active = fase === "EVENT";
 
         if (this.panelMapa) {
             this.panelMapa.active = fase === "MAP" || this.mapaAbiertoEnConsulta;
@@ -132,7 +138,8 @@ export class UIManager extends Component {
             fase === "REWARD" ||
             fase === "CHEST" ||
             fase === "CAMPFIRE" ||
-            fase === "SHOP";
+            fase === "SHOP" ||
+            fase === "EVENT";
 
         if (this.barraSuperiorReliquias) {
             this.barraSuperiorReliquias.active = fase !== "LOBBY";
@@ -154,7 +161,6 @@ export class UIManager extends Component {
         }
     }
 
-    // Asignar al Click Events de BtnToggleMapa y BtnCerrarConsulta del mapa
     public onClickToggleMapaConsulta() {
         const fase = NetworkManager.instance?.room?.state?.faseActual;
         if (fase === "MAP") return;
@@ -165,7 +171,6 @@ export class UIManager extends Component {
         }
     }
 
-    // Asignar al Click Events del nuevo botón BtnToggleMazo (arriba a la derecha junto al mapa)
     public onClickToggleMazoConsulta() {
         if (!this.visorMazo) return;
         if (this.visorMazo.node.active) {

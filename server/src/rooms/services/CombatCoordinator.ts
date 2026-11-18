@@ -45,10 +45,7 @@ export class CombatCoordinator {
             }
         });
 
-        // 1. Disparar AL_INICIAR_COMBATE antes del primer robo (permite que reliquias sumen energía, bloqueo o cartas extra)
         RelicEngine.dispararParaTodos("AL_INICIAR_COMBATE", this.state);
-
-        // 2. Iniciar el Turno 1 conservando el bloqueo/energía ganados por reliquias de inicio de combate
         this.iniciarNuevoTurnoJugadores(true);
         this.despacharVisualesYRecompensas();
     }
@@ -70,9 +67,8 @@ export class CombatCoordinator {
 
         jugador.turnoTerminado = true;
 
-        // Disparar reliquias AL_TERMINAR_TURNO y verificar si alguna mató al último enemigo
         RelicEngine.dispararParaJugador("AL_TERMINAR_TURNO", this.state, jugador);
-        CombatEngine.descartarMano(jugador);
+        CombatEngine.descartarMano(jugador, this.state);
         CombatEngine.verificarVictoriaCombate(this.state);
 
         this.verificarFinTurnoJugadores();
@@ -89,14 +85,12 @@ export class CombatCoordinator {
 
         if (!todosTerminaron) return;
 
-        // Reducir estados de los jugadores al cierre de su fase de turno
         this.state.jugadores.forEach((j) => {
             if (j.hp > 0) {
                 CombatEngine.reducirEstadosPorTurno(j);
             }
         });
 
-        // Ejecutar turno de los enemigos
         CombatEngine.ejecutarTurnoEnemigos(this.state);
 
         if (this.state.faseActual !== "COMBAT") {
@@ -126,14 +120,11 @@ export class CombatCoordinator {
             j.ataquesJugadosTurno = 0;
 
             CombatEngine.procesarInicioTurno(j, this.state);
-
-            // Si murió por veneno al iniciar su turno, AccionProcesarMuerte ya marcó turnoTerminado = true
             if (j.hp <= 0) return;
 
             CombatEngine.robarCartas(j, 5);
         });
 
-        // Verificar si todos los jugadores murieron por veneno al inicio del turno
         CombatEngine.verificarVictoriaCombate(this.state);
         if (this.state.faseActual !== "COMBAT") return;
 

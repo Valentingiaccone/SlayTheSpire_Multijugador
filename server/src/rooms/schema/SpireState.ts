@@ -15,6 +15,9 @@ export class MapNodeState extends Schema {
     @type("string") tipo: TipoNodoMapa = "COMBATE";
     @type("string") estado: EstadoNodoMapa = "BLOQUEADO";
     @type(["string"]) siguientesIds = new ArraySchema<string>();
+
+    // Propiedad privada del servidor: si está definida, el "?" es falso y revela este tipo al viajar
+    tipoRealOculto?: TipoNodoMapa;
 }
 
 export class EnemyState extends Schema {
@@ -54,12 +57,19 @@ export class PlayerState extends Schema {
     @type("string") reliquiaRecompensa: string = "";
     @type("number") oroRecompensa: number = 0;
 
-    // Estado en Fogata y Tienda
+    // Fogata y Tienda
     @type("boolean") fogataCompletada: boolean = false;
     @type("boolean") tiendaCompletada: boolean = false;
     @type("boolean") tiendaEliminacionUsada: boolean = false;
     @type(["string"]) tiendaCartas = new ArraySchema<string>();
     @type(["string"]) tiendaReliquias = new ArraySchema<string>();
+
+    // Eventos "?"
+    @type("boolean") eventoCompletado: boolean = false;
+    @type("number") eventoVotoOpcion: number = -1;
+    @type(["string"]) eventoOpcionCartas = new ArraySchema<string>();
+    @type(["string"]) eventoOpcionReliquias = new ArraySchema<string>();
+    @type(["string"]) eventoOpcionMaldiciones = new ArraySchema<string>();
 
     // Cartas y Reliquias
     @type(["string"]) mano = new ArraySchema<string>();
@@ -107,6 +117,12 @@ export class SpireState extends Schema {
     @type("boolean") hayConflictoCofre: boolean = false;
     @type("number") tiempoCuentaRegresivaCofre: number = 0;
     @type(["string"]) reliquiasCofre = new ArraySchema<string>();
+
+    // Estado del Evento "?" activo
+    @type("string") eventoActualId: string = "";
+    @type("boolean") hayEmpateEvento: boolean = false;
+    @type("number") opcionGanadoraEventoIdx: number = -1;
+    @type("number") tiempoCuentaRegresivaEvento: number = 0;
 
     @type({ map: PlayerState }) jugadores = new MapSchema<PlayerState>();
     @type([EnemyState]) enemigos = new ArraySchema<EnemyState>();
