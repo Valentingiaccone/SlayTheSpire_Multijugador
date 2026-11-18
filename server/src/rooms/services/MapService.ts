@@ -1,6 +1,7 @@
 import { Clock, Delayed } from "colyseus";
 import { SpireState, MapNodeState } from "../schema/SpireState";
 import { CONFIG_MAPA, generarMapaRun, TipoNodoMapa } from "../../../../assets/cliente/compartido/Mapa";
+import { AmbientacionId, TODAS_LAS_AMBIENTACIONES } from "../../../../assets/cliente/compartido/Enemigos";
 
 export class MapService {
     private timerMapa: Delayed | null = null;
@@ -12,11 +13,41 @@ export class MapService {
     ) {}
 
     public inicializarMapaNuevaRun(): void {
+        const mundos: AmbientacionId[] = [...TODAS_LAS_AMBIENTACIONES];
+        for (let i = mundos.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [mundos[i], mundos[j]] = [mundos[j], mundos[i]];
+        }
+
+        this.state.ordenAmbientacionesRun = mundos;
+        this.state.mapaActual = 1;
+        this.state.ambientacionActual = mundos[0];
+
+        this.construirNodosDelMapaActual();
+        this.abrirFaseMapa();
+    }
+
+    public avanzarAlSiguienteMapa(): void {
+        this.state.mapaActual += 1;
+        const idxMundo = (this.state.mapaActual - 1) % this.state.ordenAmbientacionesRun.length;
+        this.state.ambientacionActual = this.state.ordenAmbientacionesRun[idxMundo];
+
+        // Curar a todos los jugadores al 100% al cambiar de mapa
+        this.state.jugadores.forEach((j) => {
+            j.hp = j.hpMax;
+            j.bloqueo = 0;
+        });
+
+        this.construirNodosDelMapaActual();
+        this.abrirFaseMapa();
+    }
+
+    private construirNodosDelMapaActual(): void {
         this.state.nodosMapa.clear();
         this.state.nodoActualId = "";
         this.state.pisoActual = 1;
 
-        const datosMapa = generarMapaRun();
+        const datosMapa = generarMapaRun(this.state.mapaActual);
         for (const d of datosMapa) {
             const nodoSchema = new MapNodeState();
             nodoSchema.id = d.id;
@@ -28,8 +59,6 @@ export class MapService {
             d.siguientesIds.forEach((sigId) => nodoSchema.siguientesIds.push(sigId));
             this.state.nodosMapa.push(nodoSchema);
         }
-
-        this.abrirFaseMapa();
     }
 
     public abrirFaseMapa(): void {
@@ -147,7 +176,6 @@ export class MapService {
             else if (n.estado === "DISPONIBLE" && n.id !== nodoElegido.id) n.estado = "BLOQUEADO";
         });
 
-        // Si era un interrogante falso, revelamos su tipo real al llegar
         if (nodoElegido.tipoRealOculto) {
             nodoElegido.tipo = nodoElegido.tipoRealOculto;
             nodoElegido.tipoRealOculto = undefined;

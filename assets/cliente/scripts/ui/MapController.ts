@@ -1,6 +1,7 @@
 import { _decorator, Component, Node, Label, Prefab, instantiate, UITransform, Graphics, ScrollView, Vec3, Color } from "cc";
 import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
-import { CONFIG_MAPA } from "../../compartido/Mapa";
+import { CONFIG_MAPA, obtenerCantidadPisosMapa } from "../../compartido/Mapa";
+import { NOMBRES_AMBIENTACION } from "../../compartido/Enemigos";
 import { IEstadoSalaCliente, INodoMapaCliente, IJugadorCliente, PersonajeId } from "../../compartido/GameTypes";
 import { MapNodeView } from "./MapNodeView";
 
@@ -56,6 +57,8 @@ export class MapController extends Component {
     private calcularFirmaGrafo(state: IEstadoSalaCliente, enFaseMapa: boolean): string {
         const partes: string[] = [
             `${enFaseMapa}`,
+            `${state.mapaActual || 1}`,
+            `${state.ambientacionActual || ""}`,
             state.nodoActualId,
             state.nodoGanadorMapaId
         ];
@@ -71,18 +74,23 @@ export class MapController extends Component {
     private actualizarTextoCabecera(state: IEstadoSalaCliente, enFaseMapa: boolean) {
         if (!this.labelEstadoVotacion) return;
 
+        const numMapa = state.mapaActual || 1;
+        const totalMapas = CONFIG_MAPA.TOTAL_MAPAS || 3;
+        const mundoTxt = NOMBRES_AMBIENTACION[state.ambientacionActual] || state.ambientacionActual || "";
+        const infoMapa = `Mapa ${numMapa}/${totalMapas} (${mundoTxt})`;
+
         if (!enFaseMapa) {
-            this.labelEstadoVotacion.string = `Mapa (Modo Consulta) — Piso Actual: ${state.pisoActual}`;
+            this.labelEstadoVotacion.string = `${infoMapa} (Modo Consulta) — Piso Actual: ${state.pisoActual}`;
             return;
         }
 
         if (state.hayEmpateMapa) {
-            this.labelEstadoVotacion.string = "⚖️ ¡EMPATE EN LA VOTACIÓN! Dialoguen y cambien su voto";
+            this.labelEstadoVotacion.string = `${infoMapa} — ⚖️ ¡EMPATE EN LA VOTACIÓN! Dialoguen y cambien su voto`;
             return;
         }
 
         if (state.tiempoCuentaRegresivaMapa > 0) {
-            this.labelEstadoVotacion.string = `🚀 Rumbo elegido — Iniciando en ${state.tiempoCuentaRegresivaMapa}s... (podés cambiar tu voto)`;
+            this.labelEstadoVotacion.string = `${infoMapa} — 🚀 Rumbo elegido — Iniciando en ${state.tiempoCuentaRegresivaMapa}s... (podés cambiar tu voto)`;
             return;
         }
 
@@ -93,13 +101,13 @@ export class MapController extends Component {
             if (j.nodoVotadoId) votaron++;
         });
 
-        this.labelEstadoVotacion.string = `🗺️ Voten el próximo destino (${votaron}/${total} votos)`;
+        this.labelEstadoVotacion.string = `🗺️ ${infoMapa} — Voten el próximo destino (${votaron}/${total} votos)`;
     }
 
     private renderizarGrafo(state: IEstadoSalaCliente, enFaseMapa: boolean) {
         if (!this.contentScroll || !this.contenedorNodos || !this.prefabNodoMapa) return;
 
-        const totalPisos = CONFIG_MAPA.CANTIDAD_PISOS;
+        const totalPisos = obtenerCantidadPisosMapa(state.mapaActual || 1);
         const altoTotal = totalPisos * this.ESPACIO_ENTRE_PISOS + this.MARGEN_VERTICAL * 2;
 
         const uiContent = this.contentScroll.getComponent(UITransform);
@@ -184,7 +192,8 @@ export class MapController extends Component {
 
     public centrarEnPisoActual(pisoActual: number) {
         if (!this.scrollViewMapa) return;
-        const totalPisos = Math.max(2, CONFIG_MAPA.CANTIDAD_PISOS);
+        const numMapa = NetworkManager.instance?.room?.state?.mapaActual || 1;
+        const totalPisos = Math.max(2, obtenerCantidadPisosMapa(numMapa));
         const progresoDesdeAbajo = (pisoActual - 1) / (totalPisos - 1);
         this.scrollViewMapa.scrollToPercentVertical(progresoDesdeAbajo, 0.25);
     }

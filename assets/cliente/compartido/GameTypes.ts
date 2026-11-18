@@ -1,6 +1,6 @@
 import { EstadoId, FuenteDanio } from "./CondicionesYEfectos";
 import { EstadoNodoMapa, TipoNodoMapa } from "./Mapa";
-import { TipoIntencion } from "./Enemigos";
+import { AmbientacionId, TipoIntencion } from "./Enemigos";
 
 export type FaseSala =
     | "LOBBY"
@@ -219,6 +219,8 @@ export interface IEnemigoCliente {
     bloqueo: number;
     intencionTipo: TipoIntencion;
     intencionValor: number;
+    intencionGolpes: number;
+    intencionInvocarId: string;
     estados: IMapaEstadosCliente;
 }
 
@@ -233,6 +235,8 @@ export interface INodoMapaCliente {
 
 export interface IEstadoSalaCliente {
     faseActual: FaseSala;
+    mapaActual: number;
+    ambientacionActual: AmbientacionId;
     pisoActual: number;
     turnoNumero: number;
     nodoActualId: string;

@@ -1,6 +1,7 @@
 import { _decorator, Component, Node, Label, Color, Vec3, tween, UITransform, Vec2 } from "cc";
 import { IEnemigoCliente, IJugadorCliente, IMapaEstadosCliente } from "../../compartido/GameTypes";
 import { CalculadoraCombate } from "../../compartido/CalculadoraCombate";
+import { ENEMIGOS_INFO } from "../../compartido/Enemigos";
 
 const { ccclass } = _decorator;
 
@@ -51,23 +52,7 @@ export class CombatEntityView extends Component {
         this.nombreMostrado = enemigo.nombre;
         this.hpMaxMostrado = enemigo.hpMax;
         this.estadosTexto = this.formatearEstados(enemigo.estados);
-
-        if (enemigo.intencionTipo === "ATACAR") {
-            const danioReal = CalculadoraCombate.calcularDanioAtaque(
-                enemigo.intencionValor,
-                enemigo.estados,
-                estadosMiJugador
-            );
-            const indicador =
-                danioReal > enemigo.intencionValor
-                    ? "▲"
-                    : danioReal < enemigo.intencionValor
-                    ? "▼"
-                    : "";
-            this.intencionTexto = `⚔️ Ataca por ${danioReal}${indicador} (a TODOS)`;
-        } else {
-            this.intencionTexto = `🛡️ Se cubrirá +${enemigo.intencionValor}`;
-        }
+        this.intencionTexto = this.formatearIntencionEnemigo(enemigo, estadosMiJugador);
 
         if (!bloquearHpYBloqueo) {
             this.hpMostrado = enemigo.hp;
@@ -76,6 +61,63 @@ export class CombatEntityView extends Component {
         }
 
         this.refrescarLabel();
+    }
+
+    private formatearIntencionEnemigo(
+        enemigo: IEnemigoCliente,
+        estadosMiJugador?: IMapaEstadosCliente
+    ): string {
+        switch (enemigo.intencionTipo) {
+            case "ATACAR": {
+                const danioReal = CalculadoraCombate.calcularDanioAtaque(
+                    enemigo.intencionValor,
+                    enemigo.estados,
+                    estadosMiJugador
+                );
+                const indicador =
+                    danioReal > enemigo.intencionValor
+                        ? "▲"
+                        : danioReal < enemigo.intencionValor
+                        ? "▼"
+                        : "";
+                const golpes = enemigo.intencionGolpes || 1;
+                const multiTxt = golpes > 1 ? `x${golpes}` : "";
+                return `⚔️ Ataca ${danioReal}${multiTxt}${indicador}`;
+            }
+            case "BLOQUEAR":
+                return `🛡️ Bloqueo +${enemigo.intencionValor}`;
+            case "ATACAR_Y_BLOQUEAR": {
+                const danioReal = CalculadoraCombate.calcularDanioAtaque(
+                    enemigo.intencionValor,
+                    enemigo.estados,
+                    estadosMiJugador
+                );
+                const indicador =
+                    danioReal > enemigo.intencionValor
+                        ? "▲"
+                        : danioReal < enemigo.intencionValor
+                        ? "▼"
+                        : "";
+                return `⚔️${danioReal}${indicador} | 🛡️+${enemigo.intencionValor}`;
+            }
+            case "GANAR_FUERZA":
+                return `💪 +${enemigo.intencionValor} Fuerza`;
+            case "GANAR_ESPINAS":
+                return `🌵 +${enemigo.intencionValor} Espinas`;
+            case "APLICAR_VULNERABLE":
+                return `💔 Aplica ${enemigo.intencionValor} Vulnerable`;
+            case "APLICAR_DEBIL":
+                return `📉 Aplica ${enemigo.intencionValor} Débil`;
+            case "CURAR_ALIADOS":
+                return `💚 Cura aliados +${enemigo.intencionValor}`;
+            case "INVOCAR": {
+                const nombreInvocado =
+                    ENEMIGOS_INFO[enemigo.intencionInvocarId]?.nombre || enemigo.intencionInvocarId;
+                return `✨ Invoca ${enemigo.intencionValor}x ${nombreInvocado}`;
+            }
+            default:
+                return "";
+        }
     }
 
     public sincronizarAliado(

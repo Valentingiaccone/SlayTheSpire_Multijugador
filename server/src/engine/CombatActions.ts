@@ -177,18 +177,26 @@ export class AccionAplicarDanio implements IAccionCombate {
         if (
             this.atacante instanceof PlayerState &&
             this.defensor instanceof EnemyState &&
-            this.fuente === "ATAQUE_CARTA" &&
-            danioAlHp > 0 &&
-            this.defensor.hp > 0
+            this.fuente === "ATAQUE_CARTA"
         ) {
-            bus.emitir("AL_INFLIGIR_DANIO", {
-                state,
-                cola,
-                atacante: this.atacante,
-                defensor: this.defensor,
-                danioInfligido: danioAlHp,
-                fuente: this.fuente
-            });
+            if (danioAlHp > 0 && this.defensor.hp > 0) {
+                bus.emitir("AL_INFLIGIR_DANIO", {
+                    state,
+                    cola,
+                    atacante: this.atacante,
+                    defensor: this.defensor,
+                    danioInfligido: danioAlHp,
+                    fuente: this.fuente
+                });
+            }
+
+            // Si el enemigo atacado tiene ESPINAS (ej: Cactus, Espíritu de fuego/eléctrico), devuelve daño al jugador
+            const espinasEnemigo = this.defensor.estados.get("ESPINAS") || 0;
+            if (espinasEnemigo > 0 && this.atacante.hp > 0) {
+                cola.encolarAlInicio(
+                    new AccionAplicarDanio(this.defensor, this.atacante, espinasEnemigo, "ESPINAS")
+                );
+            }
         }
 
         if (this.defensor.hp <= 0) {
@@ -280,7 +288,6 @@ export class AccionRobarCartas implements IAccionCombate {
 
     ejecutar(): void {
         if (this.jugador.hp <= 0 || this.cantidad <= 0) return;
-        // Si tiene el estado SIN_ROBO (por Trance de batalla), no puede robar cartas este turno
         if ((this.jugador.estados.get("SIN_ROBO") || 0) > 0) return;
 
         for (let i = 0; i < this.cantidad; i++) {
@@ -340,7 +347,9 @@ export class AccionVerificarFinCombate implements IAccionCombate {
         const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
         if (!quedaEnemigoVivo) {
             bus.emitir("AL_FINALIZAR_COMBATE", { state, cola });
-            state.faseActual = state.pisoActual >= CONFIG_MAPA.CANTIDAD_PISOS ? "VICTORY" : "REWARD";
+            const esJefeFinalRun =
+                state.esCombateJefe && state.mapaActual >= CONFIG_MAPA.TOTAL_MAPAS;
+            state.faseActual = esJefeFinalRun ? "VICTORY" : "REWARD";
             return;
         }
 

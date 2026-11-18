@@ -11,7 +11,14 @@ import {
     TipoObjetivo
 } from "../../../assets/cliente/compartido/CondicionesYEfectos";
 import { CalculadoraCombate } from "../../../assets/cliente/compartido/CalculadoraCombate";
-import { ENEMIGOS_INFO } from "../../../assets/cliente/compartido/Enemigos";
+import {
+    CONFIG_ENEMIGOS,
+    ENEMIGOS_INFO,
+    escalarVidaEnemigo,
+    IEnemigoInfo,
+    resolverIntencionPatron,
+    sortearRangoEntero
+} from "../../../assets/cliente/compartido/Enemigos";
 import { EventoVisualCombate } from "../../../assets/cliente/compartido/GameTypes";
 import { ActionQueue } from "./ActionQueue";
 import { CombatEventBus, EntidadCombate } from "./CombatEventBus";
@@ -115,6 +122,69 @@ export class CombatEngine {
         const copia = [...this.bufferVisualSala];
         this.bufferVisualSala = [];
         return copia;
+    }
+
+    /** Crea un EnemyState con vida sorteada, escalada al mapa actual y multiplicada por jugadores */
+    public static crearInstanciaEnemigo(
+        enemigoId: string,
+        state: SpireState,
+        uid: string
+    ): EnemyState | null {
+        const info = ENEMIGOS_INFO[enemigoId];
+        if (!info) return null;
+
+        const cantidadJugadores = Math.max(1, state.jugadores.size);
+        const numeroMapa = state.mapaActual || 1;
+
+        const hpBaseSorteado = sortearRangoEntero(info.hpMin, info.hpMax);
+        const hpEscaladoMapa = escalarVidaEnemigo(hpBaseSorteado, numeroMapa);
+
+        const enemigo = new EnemyState();
+        enemigo.uid = uid;
+        enemigo.enemigoId = info.id;
+        enemigo.nombre = info.nombre;
+        enemigo.hpMax = hpEscaladoMapa * cantidadJugadores;
+        enemigo.hp = enemigo.hpMax;
+        enemigo.indicePatron = 0;
+
+        this.asignarIntencionSorteada(enemigo, info, 0, numeroMapa);
+        return enemigo;
+    }
+
+    public static asignarIntencionSorteada(
+        enemigo: EnemyState,
+        info: IEnemigoInfo,
+        indicePatron: number,
+        numeroMapa: number
+    ): void {
+        const resuelta = resolverIntencionPatron(info, indicePatron, numeroMapa);
+        enemigo.intencionTipo = resuelta.tipo;
+        enemigo.intencionValor = resuelta.valor;
+        enemigo.intencionGolpes = resuelta.golpes;
+        enemigo.intencionInvocarId = resuelta.invocarEnemigoId;
+    }
+
+    public static invocarEnemigosEnCombate(
+        state: SpireState,
+        enemigoIdAInvocar: string,
+        cantidad: number
+    ): void {
+        let vivosActuales = 0;
+        state.enemigos.forEach((e) => {
+            if (e.hp > 0) vivosActuales++;
+        });
+
+        for (let i = 0; i < cantidad; i++) {
+            if (vivosActuales >= CONFIG_ENEMIGOS.MAX_ENEMIGOS_SIMULTANEOS_EN_PANTALLA) {
+                break;
+            }
+            const uid = `inv_${enemigoIdAInvocar}_${Date.now()}_${Math.floor(Math.random() * 10000)}_${i}`;
+            const nuevo = this.crearInstanciaEnemigo(enemigoIdAInvocar, state, uid);
+            if (nuevo) {
+                state.enemigos.push(nuevo);
+                vivosActuales++;
+            }
+        }
     }
 
     public static contarAtaquesEnMano(jugador: PlayerState): number {
@@ -624,13 +694,6 @@ export class CombatEngine {
         accion.ejecutar();
     }
 
-    /**
-     * Ejecuta los efectos de cierre de turno del jugador:
-     * 1. Cartas en mano con efectosFinTurnoEnMano (Maldiciones).
-     * 2. Poder COMBUSTION (pierde 1 HP e inflige daño a todos los enemigos).
-     * 3. Estado FUERZA_TEMPORAL (pierde la Fuerza ganada por Flexión) y limpia SIN_ROBO.
-     * 4. Descarta la mano (agotando las cartas Etéreas y reteniendo las Eternas como Carnicería).
-     */
     public static descartarMano(jugador: PlayerState, state?: SpireState): void {
         if (state && jugador.hp > 0) {
             for (let i = 0; i < jugador.mano.length; i++) {
@@ -649,7 +712,6 @@ export class CombatEngine {
                 }
             }
 
-            // Poder COMBUSTION: pierde 1 HP y hace X de daño a todos los enemigos vivos
             const danioCombustion = jugador.estados.get("COMBUSTION") || 0;
             if (danioCombustion > 0 && jugador.hp > 0) {
                 this.colaActiva.encolarAlFinal(new AccionPerderHp(jugador, 1, jugador));
@@ -667,7 +729,6 @@ export class CombatEngine {
                 });
             }
 
-            // Expiración de FUERZA_TEMPORAL (Flexión) y SIN_ROBO (Trance de batalla)
             const fuerzaTemp = jugador.estados.get("FUERZA_TEMPORAL") || 0;
             if (fuerzaTemp > 0) {
                 jugador.estados.delete("FUERZA_TEMPORAL");
@@ -692,7 +753,6 @@ export class CombatEngine {
             if (data?.eterea) {
                 jugador.agotadasInterno.push(carta);
             } else if (data?.eterno) {
-                // Carnicería (eterno) permanece en la mano para el siguiente turno
                 retenidasEnMano.push(carta);
             } else {
                 jugador.descarteInterno.push(carta);
@@ -704,7 +764,11 @@ export class CombatEngine {
     }
 
     public static reducirEstadosPorTurno(entidad: EntidadCombate): void {
-        (["VULNERABLE", "DEBIL"] as EstadoId[]).forEach((estado) => {
+        // En jugadores, VULNERABLE se reduce al final del ataque enemigo para que dure la fase de ataque enemiga
+        const estadosAReducir: EstadoId[] =
+            entidad instanceof PlayerState ? ["DEBIL"] : ["VULNERABLE", "DEBIL"];
+
+        estadosAReducir.forEach((estado) => {
             const val = entidad.estados.get(estado) || 0;
             if (val > 1) entidad.estados.set(estado, val - 1);
             else if (val === 1) entidad.estados.delete(estado);
@@ -748,44 +812,172 @@ export class CombatEngine {
     }
 
     public static ejecutarTurnoEnemigos(state: SpireState): void {
-        state.enemigos.forEach((enemigo) => {
-            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
+        // Guardamos qué jugadores ya estaban vulnerables antes de que los enemigos actúen
+        const jugadoresConVulnerablePrevio = new Set<string>();
+        state.jugadores.forEach((j) => {
+            if (j.hp > 0 && (j.estados.get("VULNERABLE") || 0) > 0) {
+                jugadoresConVulnerablePrevio.add(j.sessionId);
+            }
+        });
+
+        // Los enemigos invocados durante este turno actuarán recién en el turno siguiente
+        const enemigosActuantes: EnemyState[] = [];
+        state.enemigos.forEach((e) => {
+            if (e.hp > 0) enemigosActuantes.push(e);
+        });
+
+        for (const enemigo of enemigosActuantes) {
+            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") continue;
 
             enemigo.bloqueo = 0;
             this.procesarInicioTurno(enemigo, state);
 
-            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
+            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") continue;
 
-            if (enemigo.intencionTipo === "ATACAR") {
-                state.jugadores.forEach((jugador) => {
-                    if (enemigo.hp > 0 && jugador.hp > 0 && state.faseActual === "COMBAT") {
-                        this.colaActiva.emitirVisual({
-                            tipo: "ATAQUE_EJECUTADO",
-                            atacanteId: enemigo.uid,
-                            objetivoId: jugador.sessionId,
-                            indiceGolpe: 1,
-                            totalGolpes: 1
+            switch (enemigo.intencionTipo) {
+                case "ATACAR": {
+                    const golpes = Math.max(1, enemigo.intencionGolpes || 1);
+                    for (let hit = 1; hit <= golpes; hit++) {
+                        state.jugadores.forEach((jugador) => {
+                            if (enemigo.hp > 0 && jugador.hp > 0 && state.faseActual === "COMBAT") {
+                                this.colaActiva.emitirVisual({
+                                    tipo: "ATAQUE_EJECUTADO",
+                                    atacanteId: enemigo.uid,
+                                    objetivoId: jugador.sessionId,
+                                    indiceGolpe: hit,
+                                    totalGolpes: golpes
+                                });
+                                this.colaActiva.encolarAlFinal(
+                                    new AccionAplicarDanio(
+                                        enemigo,
+                                        jugador,
+                                        enemigo.intencionValor,
+                                        "ATAQUE_ENEMIGO"
+                                    )
+                                );
+                                this.procesarColaPendiente(state);
+                            }
                         });
+                    }
+                    break;
+                }
+                case "BLOQUEAR": {
+                    this.colaActiva.encolarAlFinal(
+                        new AccionGanarBloqueo(enemigo, enemigo.intencionValor)
+                    );
+                    this.procesarColaPendiente(state);
+                    break;
+                }
+                case "ATACAR_Y_BLOQUEAR": {
+                    state.jugadores.forEach((jugador) => {
+                        if (enemigo.hp > 0 && jugador.hp > 0 && state.faseActual === "COMBAT") {
+                            this.colaActiva.emitirVisual({
+                                tipo: "ATAQUE_EJECUTADO",
+                                atacanteId: enemigo.uid,
+                                objetivoId: jugador.sessionId,
+                                indiceGolpe: 1,
+                                totalGolpes: 1
+                            });
+                            this.colaActiva.encolarAlFinal(
+                                new AccionAplicarDanio(
+                                    enemigo,
+                                    jugador,
+                                    enemigo.intencionValor,
+                                    "ATAQUE_ENEMIGO"
+                                )
+                            );
+                            this.procesarColaPendiente(state);
+                        }
+                    });
+                    if (enemigo.hp > 0 && state.faseActual === "COMBAT") {
                         this.colaActiva.encolarAlFinal(
-                            new AccionAplicarDanio(enemigo, jugador, enemigo.intencionValor, "ATAQUE_ENEMIGO")
+                            new AccionGanarBloqueo(enemigo, enemigo.intencionValor)
                         );
                         this.procesarColaPendiente(state);
                     }
-                });
-            } else if (enemigo.intencionTipo === "BLOQUEAR") {
-                this.colaActiva.encolarAlFinal(new AccionGanarBloqueo(enemigo, enemigo.intencionValor));
-                this.procesarColaPendiente(state);
+                    break;
+                }
+                case "GANAR_FUERZA": {
+                    this.colaActiva.encolarAlFinal(
+                        new AccionAplicarEstado(enemigo, "FUERZA", enemigo.intencionValor)
+                    );
+                    this.procesarColaPendiente(state);
+                    break;
+                }
+                case "GANAR_ESPINAS": {
+                    this.colaActiva.encolarAlFinal(
+                        new AccionAplicarEstado(enemigo, "ESPINAS", enemigo.intencionValor)
+                    );
+                    this.procesarColaPendiente(state);
+                    break;
+                }
+                case "APLICAR_VULNERABLE": {
+                    state.jugadores.forEach((jugador) => {
+                        if (jugador.hp > 0) {
+                            this.colaActiva.encolarAlFinal(
+                                new AccionAplicarEstado(jugador, "VULNERABLE", enemigo.intencionValor)
+                            );
+                        }
+                    });
+                    this.procesarColaPendiente(state);
+                    break;
+                }
+                case "APLICAR_DEBIL": {
+                    state.jugadores.forEach((jugador) => {
+                        if (jugador.hp > 0) {
+                            this.colaActiva.encolarAlFinal(
+                                new AccionAplicarEstado(jugador, "DEBIL", enemigo.intencionValor)
+                            );
+                        }
+                    });
+                    this.procesarColaPendiente(state);
+                    break;
+                }
+                case "CURAR_ALIADOS": {
+                    state.enemigos.forEach((aliadoEnemigo) => {
+                        if (aliadoEnemigo.hp > 0) {
+                            this.colaActiva.encolarAlFinal(
+                                new AccionCurarHp(aliadoEnemigo, enemigo.intencionValor)
+                            );
+                        }
+                    });
+                    this.procesarColaPendiente(state);
+                    break;
+                }
+                case "INVOCAR": {
+                    if (enemigo.intencionInvocarId) {
+                        this.invocarEnemigosEnCombate(
+                            state,
+                            enemigo.intencionInvocarId,
+                            enemigo.intencionValor
+                        );
+                    }
+                    break;
+                }
             }
 
-            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") return;
+            if (enemigo.hp <= 0 || state.faseActual !== "COMBAT") continue;
 
             this.reducirEstadosPorTurno(enemigo);
 
             const info = ENEMIGOS_INFO[enemigo.enemigoId];
             if (info && info.patron.length > 0) {
                 enemigo.indicePatron = (enemigo.indicePatron + 1) % info.patron.length;
-                enemigo.intencionTipo = info.patron[enemigo.indicePatron].tipo;
-                enemigo.intencionValor = info.patron[enemigo.indicePatron].valor;
+                this.asignarIntencionSorteada(
+                    enemigo,
+                    info,
+                    enemigo.indicePatron,
+                    state.mapaActual || 1
+                );
+            }
+        }
+
+        // Reducir VULNERABLE en los jugadores que ya lo tenían antes de esta fase enemiga
+        state.jugadores.forEach((j) => {
+            if (j.hp > 0 && jugadoresConVulnerablePrevio.has(j.sessionId)) {
+                const val = j.estados.get("VULNERABLE") || 0;
+                if (val > 1) j.estados.set("VULNERABLE", val - 1);
+                else if (val === 1) j.estados.delete("VULNERABLE");
             }
         });
 
@@ -797,10 +989,6 @@ export class CombatEngine {
         this.procesarColaPendiente(state);
     }
 
-    /**
-     * Sincroniza un ArraySchema sin usar .splice() ni .shift() para evitar
-     * que Colyseus desfase los índices o deje cartas fantasma en el cliente.
-     */
     public static sincronizarArraySchema(schemaArr: any, nuevoContenido: string[]): void {
         while (schemaArr.length > nuevoContenido.length) {
             schemaArr.pop();

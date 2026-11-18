@@ -9,7 +9,7 @@ import {
     IPayloadAccionEvento
 } from "../../../assets/cliente/compartido/GameTypes";
 import { obtenerMazoInicial } from "../../../assets/cliente/compartido/Cartas";
-import { TipoNodoMapa } from "../../../assets/cliente/compartido/Mapa";
+import { CONFIG_MAPA, TipoNodoMapa } from "../../../assets/cliente/compartido/Mapa";
 import { MapService } from "./services/MapService";
 import { ChestService } from "./services/ChestService";
 import { RewardService } from "./services/RewardService";
@@ -33,6 +33,15 @@ export class SpireRoom extends Room<SpireState> {
         this.setState(new SpireState());
 
         const avanzarAlMapa = () => {
+            if (this.state.esCombateJefe) {
+                this.state.esCombateJefe = false;
+                if (this.state.mapaActual < CONFIG_MAPA.TOTAL_MAPAS) {
+                    this.mapService.avanzarAlSiguienteMapa();
+                } else {
+                    this.state.faseActual = "VICTORY";
+                }
+                return;
+            }
             this.mapService.desbloquearSiguientesNodos();
             this.mapService.abrirFaseMapa();
         };
@@ -201,9 +210,12 @@ export class SpireRoom extends Room<SpireState> {
             this.mapService.cancelarCuentaRegresiva();
             this.chestService.cancelarCuentaRegresiva();
             this.eventService.cancelarCuentaRegresiva();
+            this.state.mapaActual = 1;
             this.state.pisoActual = 1;
             this.state.turnoNumero = 1;
             this.state.nodoActualId = "";
+            this.state.esCombateElite = false;
+            this.state.esCombateJefe = false;
             this.state.nodosMapa.clear();
             this.state.enemigos.clear();
 
@@ -228,7 +240,6 @@ export class SpireRoom extends Room<SpireState> {
             this.state.faseActual = "LOBBY";
         });
 
-        // Atajos de teclado para testeo local rápido (Teclas 1 a 6)
         this.onMessage("debug_comando", (client, data: { accion: string }) => {
             const jugador = this.state.jugadores.get(client.sessionId);
             if (!jugador || !data?.accion) return;
@@ -249,8 +260,12 @@ export class SpireRoom extends Room<SpireState> {
                         this.state.enemigos.forEach((e) => {
                             e.hp = 0;
                         });
-                        this.rewardService.prepararRecompensas();
-                        this.state.faseActual = "REWARD";
+                        if (this.state.esCombateJefe && this.state.mapaActual >= CONFIG_MAPA.TOTAL_MAPAS) {
+                            this.state.faseActual = "VICTORY";
+                        } else {
+                            this.rewardService.prepararRecompensas();
+                            this.state.faseActual = "REWARD";
+                        }
                     }
                     break;
                 case "BUFF_TEST":

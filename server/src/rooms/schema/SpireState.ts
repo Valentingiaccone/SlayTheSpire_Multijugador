@@ -6,7 +6,7 @@ import {
     ECONOMIA_CONFIG
 } from "../../../../assets/cliente/compartido/GameTypes";
 import { EstadoNodoMapa, TipoNodoMapa } from "../../../../assets/cliente/compartido/Mapa";
-import { TipoIntencion } from "../../../../assets/cliente/compartido/Enemigos";
+import { AmbientacionId, TipoIntencion } from "../../../../assets/cliente/compartido/Enemigos";
 
 export class MapNodeState extends Schema {
     @type("string") id: string = "";
@@ -27,6 +27,8 @@ export class EnemyState extends Schema {
     @type("number") hpMax: number = 0;
     @type("number") bloqueo: number = 0;
     @type("number") intencionValor: number = 0;
+    @type("number") intencionGolpes: number = 1;
+    @type("string") intencionInvocarId: string = "";
     @type("string") intencionTipo: TipoIntencion = "ATACAR";
     @type({ map: "number" }) estados = new MapSchema<number>();
 
@@ -102,6 +104,8 @@ export class PlayerState extends Schema {
 
 export class SpireState extends Schema {
     @type("string") faseActual: FaseSala = "LOBBY";
+    @type("number") mapaActual: number = 1;
+    @type("string") ambientacionActual: AmbientacionId = "BRAWL_STARS";
     @type("number") pisoActual: number = 1;
     @type("number") turnoNumero: number = 1;
     @type("string") nodoActualId: string = "";
@@ -126,4 +130,6 @@ export class SpireState extends Schema {
     @type({ map: PlayerState }) jugadores = new MapSchema<PlayerState>();
     @type([EnemyState]) enemigos = new ArraySchema<EnemyState>();
     @type([MapNodeState]) nodosMapa = new ArraySchema<MapNodeState>();
+
+    ordenAmbientacionesRun: AmbientacionId[] = ["BRAWL_STARS", "CLASH_ROYALE", "POKEMON"];
 }

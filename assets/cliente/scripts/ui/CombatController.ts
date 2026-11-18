@@ -18,6 +18,7 @@ import { CardView } from "./CardView";
 import { CombatEntityView } from "./CombatEntityView";
 import { CombatSequencer } from "./CombatSequencer";
 import { DeckViewerController } from "./DeckViewerController";
+import { NOMBRES_AMBIENTACION } from "../../compartido/Enemigos";
 
 const { ccclass, property } = _decorator;
 
@@ -88,12 +89,11 @@ export class CombatController extends Component {
     private onEstadoCambiado(state: IEstadoSalaCliente) {
         if (state.faseActual !== "COMBAT" && state.faseActual !== "DEFEAT") return;
 
-        if (this.labelTurno) {
-            this.labelTurno.string =
-                state.faseActual === "DEFEAT"
-                    ? "¡DERROTA! Todos cayeron"
-                    : `Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
-        }
+        const mundoTxt = NOMBRES_AMBIENTACION[state.ambientacionActual] || "";
+        this.labelTurno.string =
+            state.faseActual === "DEFEAT"
+                ? "¡DERROTA! Todos cayeron"
+                : `Mapa ${state.mapaActual || 1}/3 (${mundoTxt})  —  Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
 
         const miId = NetworkManager.instance?.room?.sessionId;
         const miJugador = miId ? state.jugadores.get(miId) : undefined;

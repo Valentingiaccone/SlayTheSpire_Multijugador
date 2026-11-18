@@ -6,10 +6,6 @@ export interface INodoMapaData {
     piso: number;
     columna: number;
     tipo: TipoNodoMapa;
-    /**
-     * Si el nodo es un interrogante falso, `tipo` vale "EVENTO" (lo que ven los jugadores en el mapa)
-     * y `tipoRealOculto` guarda el evento verdadero ("ELITE", "COMBATE", "COFRE", etc.).
-     */
     tipoRealOculto?: TipoNodoMapa;
     estado: EstadoNodoMapa;
     siguientesIds: string[];
@@ -22,22 +18,24 @@ export interface IReglaAparicionNodo {
 }
 
 export const CONFIG_MAPA = {
-    CANTIDAD_PISOS: 12,
+    TOTAL_MAPAS: 3,
+    PISOS_POR_MAPA: {
+        1: 16,
+        2: 15,
+        3: 14
+    } as Record<number, number>,
+    CANTIDAD_PISOS: 16,
     COLUMNAS: 5,
     MIN_HOJAS_INICIO: 3,
     MAX_HOJAS_INICIO: 4,
     SEGUNDOS_CUENTA_REGRESIVA: 3,
-    /**
-     * Porcentaje (0 a 100) de que un nodo intermedio (Piso 2 a totalPisos - 2) que NO sea EVENTO
-     * se camufle con un signo de interrogación ("?") ocultando su verdadero encuentro.
-     */
     PROBABILIDAD_INTERROGANTE_FALSO: 3
 };
 
-/**
- * Reglas aplicadas exclusivamente en pisos intermedios (Piso 2 hasta totalPisos - 2).
- * El Piso 1 es siempre COMBATE, el piso (totalPisos - 1) es siempre HOGUERA y el último es JEFE.
- */
+export function obtenerCantidadPisosMapa(numeroMapa: number = 1): number {
+    return CONFIG_MAPA.PISOS_POR_MAPA[numeroMapa] || CONFIG_MAPA.CANTIDAD_PISOS;
+}
+
 export const REGLAS_NODOS_MAPA: Partial<Record<TipoNodoMapa, IReglaAparicionNodo>> = {
     EVENTO: { min: 2, max: 5, probabilidad: 25 },
     ELITE: { min: 2, max: 4, probabilidad: 20 },
@@ -46,8 +44,8 @@ export const REGLAS_NODOS_MAPA: Partial<Record<TipoNodoMapa, IReglaAparicionNodo
     HOGUERA: { min: 1, max: 2, probabilidad: 14 }
 };
 
-export function generarMapaRun(): INodoMapaData[] {
-    const totalPisos = Math.max(4, CONFIG_MAPA.CANTIDAD_PISOS);
+export function generarMapaRun(numeroMapa: number = 1): INodoMapaData[] {
+    const totalPisos = Math.max(4, obtenerCantidadPisosMapa(numeroMapa));
     const totalCols = CONFIG_MAPA.COLUMNAS;
     const mapaPorPiso: Map<number, Map<number, INodoMapaData>> = new Map();
 
@@ -55,7 +53,7 @@ export function generarMapaRun(): INodoMapaData[] {
         mapaPorPiso.set(p, new Map());
     }
 
-    // 1. Piso 1: Hojas iniciales (siempre COMBATE, nunca interrogantes)
+    // 1. Piso 1: Hojas iniciales (siempre COMBATE)
     const colsDisponibles = Array.from({ length: totalCols }, (_, i) => i);
     mezclarArray(colsDisponibles);
     const cantHojas = Math.min(
@@ -67,7 +65,7 @@ export function generarMapaRun(): INodoMapaData[] {
 
     for (const col of colsPiso1) {
         mapaPorPiso.get(1)!.set(col, {
-            id: `p1_c${col}`,
+            id: `m${numeroMapa}_p1_c${col}`,
             piso: 1,
             columna: col,
             tipo: "COMBATE",
@@ -100,7 +98,7 @@ export function generarMapaRun(): INodoMapaData[] {
                 if (!pisoSiguiente.has(colDestino)) {
                     const esFilaPreJefe = p + 1 === totalPisos - 1;
                     pisoSiguiente.set(colDestino, {
-                        id: `p${p + 1}_c${colDestino}`,
+                        id: `m${numeroMapa}_p${p + 1}_c${colDestino}`,
                         piso: p + 1,
                         columna: colDestino,
                         tipo: esFilaPreJefe ? "HOGUERA" : "COMBATE",
@@ -120,7 +118,7 @@ export function generarMapaRun(): INodoMapaData[] {
     // 3. Último Piso: Único nodo JEFE
     const colJefe = Math.floor(totalCols / 2);
     const nodoJefe: INodoMapaData = {
-        id: `p${totalPisos}_jefe`,
+        id: `m${numeroMapa}_p${totalPisos}_jefe`,
         piso: totalPisos,
         columna: colJefe,
         tipo: "JEFE",
@@ -129,14 +127,13 @@ export function generarMapaRun(): INodoMapaData[] {
     };
     mapaPorPiso.get(totalPisos)!.set(colJefe, nodoJefe);
 
-    // Todos los nodos de la fila de Fogatas (totalPisos - 1) conectan al Jefe y nunca se camuflan
     const nodosAnteultimo = Array.from(mapaPorPiso.get(totalPisos - 1)!.values());
     for (const nodo of nodosAnteultimo) {
         nodo.tipo = "HOGUERA";
         nodo.siguientesIds.push(nodoJefe.id);
     }
 
-    // 4. Distribuir tipos intermedios (Piso 2 hasta totalPisos - 2) y aplicar Interrogantes Falsos
+    // 4. Distribuir tipos intermedios y camuflar interrogantes falsos
     distribuirTiposNodosIntermedios(mapaPorPiso, totalPisos);
 
     const resultado: INodoMapaData[] = [];
@@ -152,7 +149,6 @@ function distribuirTiposNodosIntermedios(
     totalPisos: number
 ) {
     const nodosIntermedios: INodoMapaData[] = [];
-    // Solo pisos entre 2 y totalPisos - 2 (excluye Piso 1, fila final de Fogatas y Jefe)
     for (let p = 2; p <= totalPisos - 2; p++) {
         nodosIntermedios.push(...Array.from(mapaPorPiso.get(p)!.values()));
     }
@@ -162,7 +158,6 @@ function distribuirTiposNodosIntermedios(
     const entradasReglas = Object.entries(REGLAS_NODOS_MAPA) as [TipoNodoMapa, IReglaAparicionNodo][];
     entradasReglas.forEach(([tipo]) => (conteoActual[tipo] = 0));
 
-    // Paso A: Garantizar el mínimo de cada tipo
     for (const [tipo, regla] of entradasReglas) {
         for (const nodo of nodosIntermedios) {
             if (conteoActual[tipo] >= regla.min) break;
@@ -173,7 +168,6 @@ function distribuirTiposNodosIntermedios(
         }
     }
 
-    // Paso B: Tirar porcentajes en los nodos restantes
     for (const nodo of nodosIntermedios) {
         if (nodo.tipo !== "COMBATE") continue;
 
@@ -187,7 +181,6 @@ function distribuirTiposNodosIntermedios(
         }
     }
 
-    // Paso C: Camuflar nodos con Interrogantes Falsos (solo en Piso 2 hasta totalPisos - 2)
     for (const nodo of nodosIntermedios) {
         if (nodo.tipo !== "EVENTO") {
             if (Math.random() * 100 < CONFIG_MAPA.PROBABILIDAD_INTERROGANTE_FALSO) {

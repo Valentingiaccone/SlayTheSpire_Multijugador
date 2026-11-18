@@ -1,5 +1,5 @@
-import { SpireState, EnemyState } from "../schema/SpireState";
-import { ENEMIGOS_INFO, obtenerEncuentroAleatorio } from "../../../../assets/cliente/compartido/Enemigos";
+import { SpireState } from "../schema/SpireState";
+import { obtenerEncuentroAleatorio } from "../../../../assets/cliente/compartido/Enemigos";
 import { EventoVisualCombate } from "../../../../assets/cliente/compartido/GameTypes";
 import { CombatEngine } from "../../engine/CombatEngine";
 import { RelicEngine } from "../../engine/RelicEngine";
@@ -18,23 +18,20 @@ export class CombatCoordinator {
         this.state.esCombateJefe = tipoCombate === "JEFE";
         this.state.enemigos.clear();
 
-        const cantidadJugadores = Math.max(1, this.state.jugadores.size);
-        const idsEnemigos = obtenerEncuentroAleatorio(tipoCombate, this.state.pisoActual);
+        const idsEnemigos = obtenerEncuentroAleatorio(
+            tipoCombate,
+            this.state.ambientacionActual
+        );
 
         idsEnemigos.forEach((enemigoId, index) => {
-            const info = ENEMIGOS_INFO[enemigoId];
-            if (!info) return;
-
-            const enemigo = new EnemyState();
-            enemigo.uid = `enemigo_${index}_${Date.now()}`;
-            enemigo.enemigoId = info.id;
-            enemigo.nombre = info.nombre;
-            enemigo.hpMax = info.hpBase * cantidadJugadores;
-            enemigo.hp = enemigo.hpMax;
-            enemigo.indicePatron = 0;
-            enemigo.intencionTipo = info.patron[0].tipo;
-            enemigo.intencionValor = info.patron[0].valor;
-            this.state.enemigos.push(enemigo);
+            const enemigo = CombatEngine.crearInstanciaEnemigo(
+                enemigoId,
+                this.state,
+                `enemigo_${index}_${Date.now()}`
+            );
+            if (enemigo) {
+                this.state.enemigos.push(enemigo);
+            }
         });
 
         this.state.jugadores.forEach((j) => {
