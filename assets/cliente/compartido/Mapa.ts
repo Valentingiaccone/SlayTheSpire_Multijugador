@@ -37,11 +37,11 @@ export function obtenerCantidadPisosMapa(numeroMapa: number = 1): number {
 }
 
 export const REGLAS_NODOS_MAPA: Partial<Record<TipoNodoMapa, IReglaAparicionNodo>> = {
-    EVENTO: { min: 2, max: 5, probabilidad: 25 },
-    ELITE: { min: 2, max: 4, probabilidad: 20 },
-    TIENDA: { min: 1, max: 3, probabilidad: 18 },
-    COFRE: { min: 2, max: 3, probabilidad: 15 },
-    HOGUERA: { min: 1, max: 2, probabilidad: 14 }
+    EVENTO: { min: 4, max: 7, probabilidad: 35 },
+    ELITE: { min: 3, max: 5, probabilidad: 25 },
+    TIENDA: { min: 3, max: 5, probabilidad: 20 },
+    COFRE: { min: 3, max: 4, probabilidad: 15 },
+    HOGUERA: { min: 4, max: 5, probabilidad: 20 }
 };
 
 export function generarMapaRun(numeroMapa: number = 1): INodoMapaData[] {

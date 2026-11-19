@@ -99,8 +99,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "BRAWL_STARS",
         categoria: "NORMAL",
         espacio: 2,
-        hpMin: 15,
-        hpMax: 18,
+        hpMin: 14,
+        hpMax: 16,
         patron: [
             { tipo: "ATACAR", valorMin: 5, valorMax: 5 },
             { tipo: "ATACAR", valorMin: 8, valorMax: 8 },
@@ -144,8 +144,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "BRAWL_STARS",
         categoria: "NORMAL",
         espacio: 4,
-        hpMin: 28,
-        hpMax: 32,
+        hpMin: 31,
+        hpMax: 34,
         patron: [
             { tipo: "GANAR_ESPINAS", valorMin: 1, valorMax: 1 },
             { tipo: "GANAR_ESPINAS", valorMin: 1, valorMax: 1 },
@@ -159,8 +159,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "BRAWL_STARS",
         categoria: "ELITE",
         espacio: 7,
-        hpMin: 65,
-        hpMax: 70,
+        hpMin: 85,
+        hpMax: 95,
         patron: [
             { tipo: "ATACAR", valorMin: 8, valorMax: 8 },
             { tipo: "BLOQUEAR", valorMin: 10, valorMax: 10 },
@@ -175,8 +175,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "BRAWL_STARS",
         categoria: "JEFE",
         espacio: 10,
-        hpMin: 110,
-        hpMax: 120,
+        hpMin: 150,
+        hpMax: 160,
         patron: [
             { tipo: "BLOQUEAR", valorMin: 11, valorMax: 13 },
             { tipo: "ATACAR", valorMin: 14, valorMax: 15 },
@@ -259,8 +259,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "CLASH_ROYALE",
         categoria: "NORMAL",
         espacio: 3,
-        hpMin: 18,
-        hpMax: 21,
+        hpMin: 23,
+        hpMax: 26,
         patron: [
             { tipo: "ATACAR", valorMin: 4, valorMax: 5 },
             { tipo: "ATACAR", valorMin: 6, valorMax: 7 }
@@ -272,8 +272,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "CLASH_ROYALE",
         categoria: "NORMAL",
         espacio: 4,
-        hpMin: 30,
-        hpMax: 34,
+        hpMin: 32,
+        hpMax: 36,
         patron: [
             { tipo: "ATACAR", valorMin: 3, valorMax: 3 },
             { tipo: "ATACAR_Y_BLOQUEAR", valorMin: 3, valorMax: 4 },
@@ -286,14 +286,14 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "CLASH_ROYALE",
         categoria: "NORMAL",
         espacio: 5,
-        hpMin: 40,
-        hpMax: 44,
+        hpMin: 44,
+        hpMax: 48,
         patron: [
-            { tipo: "INVOCAR", valorMin: 1, valorMax: 1, invocarEnemigoId: "espiritu_fuego" },
-            { tipo: "INVOCAR", valorMin: 1, valorMax: 1, invocarEnemigoId: "espiritu_hielo" },
-            { tipo: "INVOCAR", valorMin: 1, valorMax: 1, invocarEnemigoId: "espiritu_sanador" },
-            { tipo: "INVOCAR", valorMin: 1, valorMax: 1, invocarEnemigoId: "espiritu_electrico" },
-            { tipo: "ATACAR_Y_BLOQUEAR", valorMin: 7, valorMax: 7 }
+            { tipo: "INVOCAR", valorMin: 1, valorMax: 2, invocarEnemigoId: "espiritu_fuego" },
+            { tipo: "INVOCAR", valorMin: 1, valorMax: 2, invocarEnemigoId: "espiritu_hielo" },
+            { tipo: "INVOCAR", valorMin: 1, valorMax: 2, invocarEnemigoId: "espiritu_sanador" },
+            { tipo: "INVOCAR", valorMin: 1, valorMax: 2, invocarEnemigoId: "espiritu_electrico" },
+            { tipo: "ATACAR_Y_BLOQUEAR", valorMin: 7, valorMax: 8 }
         ]
     },
     bruja: {
@@ -302,10 +302,10 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "CLASH_ROYALE",
         categoria: "ELITE",
         espacio: 6,
-        hpMin: 50,
-        hpMax: 55,
+        hpMin: 75,
+        hpMax: 85,
         patron: [
-            { tipo: "INVOCAR", valorMin: 2, valorMax: 2, invocarEnemigoId: "larry" },
+            { tipo: "INVOCAR", valorMin: 2, valorMax: 3, invocarEnemigoId: "larry" },
             { tipo: "ATACAR", valorMin: 3, valorMax: 3, golpes: 2 },
             { tipo: "BLOQUEAR", valorMin: 15, valorMax: 15 },
             { tipo: "INVOCAR", valorMin: 4, valorMax: 5, invocarEnemigoId: "larry" },
@@ -319,8 +319,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "CLASH_ROYALE",
         categoria: "JEFE",
         espacio: 10,
-        hpMin: 125,
-        hpMax: 132,
+        hpMin: 250,
+        hpMax: 265,
         patron: [
             { tipo: "BLOQUEAR", valorMin: 14, valorMax: 16 },
             { tipo: "GANAR_FUERZA", valorMin: 4, valorMax: 6 },
@@ -352,8 +352,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "POKEMON",
         categoria: "NORMAL",
         espacio: 6,
-        hpMin: 40,
-        hpMax: 45,
+        hpMin: 36,
+        hpMax: 40,
         patron: [
             { tipo: "ATACAR", valorMin: 2, valorMax: 2, golpes: 2 },
             { tipo: "GANAR_FUERZA", valorMin: 1, valorMax: 1 },
@@ -382,8 +382,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "POKEMON",
         categoria: "ELITE",
         espacio: 10,
-        hpMin: 75,
-        hpMax: 82,
+        hpMin: 78,
+        hpMax: 84,
         patron: [
             { tipo: "ATACAR", valorMin: 20, valorMax: 20 }
         ]
@@ -394,8 +394,8 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "POKEMON",
         categoria: "JEFE",
         espacio: 10,
-        hpMin: 100,
-        hpMax: 110,
+        hpMin: 160,
+        hpMax: 170,
         patron: [
             { tipo: "ATACAR", valorMin: 11, valorMax: 13 },
             { tipo: "GANAR_FUERZA", valorMin: 2, valorMax: 3 },

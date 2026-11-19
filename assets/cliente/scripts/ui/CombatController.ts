@@ -19,6 +19,7 @@ import { CombatEntityView } from "./CombatEntityView";
 import { CombatSequencer } from "./CombatSequencer";
 import { DeckViewerController } from "./DeckViewerController";
 import { NOMBRES_AMBIENTACION } from "../../compartido/Enemigos";
+import { TooltipPopupView } from "./TooltipPopupView";
 
 const { ccclass, property } = _decorator;
 
@@ -48,6 +49,8 @@ export class CombatController extends Component {
     @property(Label) labelCantAgotadas: Label = null!;
 
     @property(DeckViewerController) visorMazo: DeckViewerController = null!;
+
+    @property(TooltipPopupView) tooltipCombate: TooltipPopupView = null!;
 
     private vistasEnemigos: Map<string, CombatEntityView> = new Map();
     private vistasAliados: Map<string, CombatEntityView> = new Map();
@@ -80,6 +83,7 @@ export class CombatController extends Component {
         NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
         NetworkEvents.off(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
         this.secuenciador?.limpiar();
+        this.tooltipCombate?.ocultar()
     }
 
     private onSecuenciaRecibida(eventos: EventoVisualCombate[]) {
@@ -124,6 +128,9 @@ export class CombatController extends Component {
                 nodo.parent = this.contenedorEnemigos;
                 vista = nodo.getComponent(CombatEntityView) || nodo.addComponent(CombatEntityView);
                 this.vistasEnemigos.set(enemigo.uid, vista);
+                vista.vincularTooltip((nodoOrigen, titulo, desc) =>
+                    this.tooltipCombate?.mostrar(nodoOrigen, titulo, desc)
+                );
                 vista.sincronizarEnemigo(enemigo, false, estadosMiJugador);
             } else {
                 vista.sincronizarEnemigo(enemigo, bloquearHpYBloqueo, estadosMiJugador);
@@ -163,6 +170,9 @@ export class CombatController extends Component {
                 nodo.parent = this.contenedorAliados;
                 vista = nodo.getComponent(CombatEntityView) || nodo.addComponent(CombatEntityView);
                 this.vistasAliados.set(j.sessionId, vista);
+                vista.vincularTooltip((nodoOrigen, titulo, desc) =>
+                    this.tooltipCombate?.mostrar(nodoOrigen, titulo, desc)
+                );
                 vista.sincronizarAliado(j, esYo, false);
             } else {
                 vista.sincronizarAliado(j, esYo, bloquearHpYBloqueo);

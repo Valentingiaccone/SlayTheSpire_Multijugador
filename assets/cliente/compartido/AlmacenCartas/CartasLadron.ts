@@ -113,13 +113,14 @@ export const CARTAS_LADRON: ICartaData[] = [
         tipo: "ATAQUE",
         objetivoSeleccion: "ENEMIGO",
         enPoolRecompensa: true,
-        descripcion: "Inflige {D} de daño y gana 5 de oro.",
+        agotar: true,
+        descripcion: "Inflige {D} de daño y gana 5 de oro. Se agota.",
         efectos: [
             { tipo: "DANIO", valor: 5, objetivo: "ENEMIGO" },
             { tipo: "GANAR_ORO", valor: 5 }
         ],
         mejora: {
-            descripcion: "Inflige {D} de daño y gana 8 de oro.",
+            descripcion: "Inflige {D} de daño y gana 8 de oro. Se agota.",
             efectos: [
                 { tipo: "DANIO", valor: 8, objetivo: "ENEMIGO" },
                 { tipo: "GANAR_ORO", valor: 8 }
@@ -136,14 +137,15 @@ export const CARTAS_LADRON: ICartaData[] = [
         tipo: "ATAQUE",
         objetivoSeleccion: "ENEMIGO",
         enPoolRecompensa: true,
-        descripcion: "Inflige {D} de daño, gana {B} de bloqueo y gana 4 de oro.",
+        agotar: true,
+        descripcion: "Inflige {D} de daño, gana {B} de bloqueo y gana 4 de oro. Se agota.",
         efectos: [
             { tipo: "DANIO", valor: 4, objetivo: "ENEMIGO" },
             { tipo: "BLOQUEO", valor: 4, objetivo: "PROPIO" },
             { tipo: "GANAR_ORO", valor: 4 }
         ],
         mejora: {
-            descripcion: "Inflige {D} de daño, gana {B} de bloqueo y gana 6 de oro.",
+            descripcion: "Inflige {D} de daño, gana {B} de bloqueo y gana 6 de oro. Se agota.",
             efectos: [
                 { tipo: "DANIO", valor: 6, objetivo: "ENEMIGO" },
                 { tipo: "BLOQUEO", valor: 6, objetivo: "PROPIO" },
@@ -274,7 +276,8 @@ export const CARTAS_LADRON: ICartaData[] = [
         calidad: "EPICA",
         tipo: "HABILIDAD",
         enPoolRecompensa: true,
-        descripcion: "50% de ganar 50 de oro o perder 25 de oro. Roba 1 carta.",
+        agotar: true,
+        descripcion: "50% de ganar 50 de oro o perder 25 de oro. Roba 1 carta. Se agota.",
         efectos: [
             { tipo: "APUESTA_ORO", probabilidadExito: 50, oroGanado: 50, oroPerdido: 25 },
             { tipo: "ROBAR_CARTA", valor: 1, objetivo: "PROPIO" }
@@ -362,7 +365,8 @@ export const CARTAS_LADRON: ICartaData[] = [
         calidad: "EPICA",
         tipo: "ATAQUE",
         enPoolRecompensa: true,
-        descripcion: "Inflige {D} de daño a todos los enemigos 2 veces. Si golpea la salud del enemigo, gana 3 de oro.",
+        agotar: true,
+        descripcion: "Inflige {D} de daño a todos los enemigos 2 veces. Si golpea la salud del enemigo, gana 3 de oro. Se agota.",
         efectos: [
             {
                 tipo: "DANIO",
@@ -373,7 +377,7 @@ export const CARTAS_LADRON: ICartaData[] = [
             }
         ],
         mejora: {
-            descripcion: "Inflige {D} de daño a todos los enemigos 2 veces. Si golpea la salud del enemigo, gana 4 de oro.",
+            descripcion: "Inflige {D} de daño a todos los enemigos 2 veces. Si golpea la salud del enemigo, gana 4 de oro. Se agota.",
             efectos: [
                 {
                     tipo: "DANIO",
@@ -419,16 +423,16 @@ export const CARTAS_LADRON: ICartaData[] = [
         objetivoSeleccion: "ENEMIGO",
         agotar: true,
         enPoolRecompensa: true,
-        descripcion: "Inflige {D} de daño. Gana 1 de oro por cada HP que le falte al enemigo (máx. 200). Se agota.",
+        descripcion: "Inflige {D} de daño. Gana 1 de oro por cada HP que le falte al enemigo (máx. 50). Se agota.",
         efectos: [
             { tipo: "DANIO", valor: 6, objetivo: "ENEMIGO" },
-            { tipo: "ORO_POR_HP_FALTANTE_ENEMIGO", oroPorHp: 1, maximoOro: 200, objetivo: "ENEMIGO" }
+            { tipo: "ORO_POR_HP_FALTANTE_ENEMIGO", oroPorHp: 1, maximoOro: 50, objetivo: "ENEMIGO" }
         ],
         mejora: {
-            descripcion: "Inflige {D} de daño. Gana 1 de oro por cada HP que le falte al enemigo (máx. 250). Se agota.",
+            descripcion: "Inflige {D} de daño. Gana 1 de oro por cada HP que le falte al enemigo (máx. 75). Se agota.",
             efectos: [
                 { tipo: "DANIO", valor: 10, objetivo: "ENEMIGO" },
-                { tipo: "ORO_POR_HP_FALTANTE_ENEMIGO", oroPorHp: 1, maximoOro: 250, objetivo: "ENEMIGO" }
+                { tipo: "ORO_POR_HP_FALTANTE_ENEMIGO", oroPorHp: 1, maximoOro: 75, objetivo: "ENEMIGO" }
             ]
         }
     },
