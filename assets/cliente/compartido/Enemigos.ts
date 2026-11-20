@@ -102,9 +102,9 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         hpMin: 14,
         hpMax: 16,
         patron: [
-            { tipo: "ATACAR", valorMin: 5, valorMax: 5 },
-            { tipo: "ATACAR", valorMin: 8, valorMax: 8 },
-            { tipo: "ATACAR", valorMin: 9, valorMax: 11 }
+            { tipo: "ATACAR", valorMin: 3, valorMax: 4 },
+            { tipo: "ATACAR", valorMin: 5, valorMax: 6 },
+            { tipo: "ATACAR", valorMin: 7, valorMax: 8 }
         ]
     },
     robot: {
@@ -120,7 +120,6 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
             { tipo: "BLOQUEAR", valorMin: 6, valorMax: 6 },
             { tipo: "GANAR_FUERZA", valorMin: 2, valorMax: 2 },
             { tipo: "ATACAR_Y_BLOQUEAR", valorMin: 3, valorMax: 3 },
-            { tipo: "ATACAR", valorMin: 4, valorMax: 6 },
             { tipo: "ATACAR", valorMin: 2, valorMax: 2, golpes: 2 }
         ]
     },
@@ -133,9 +132,10 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         hpMin: 30,
         hpMax: 34,
         patron: [
-            { tipo: "ATACAR", valorMin: 5, valorMax: 7 },
-            { tipo: "ATACAR", valorMin: 8, valorMax: 9 },
-            { tipo: "ATACAR", valorMin: 10, valorMax: 12 }
+            { tipo: "ATACAR", valorMin: 4, valorMax: 4 },
+            { tipo: "ATACAR", valorMin: 6, valorMax: 7 },
+            { tipo: "ATACAR", valorMin: 4, valorMax: 4 },
+            { tipo: "ATACAR", valorMin: 10, valorMax: 12 },
         ]
     },
     cactus: {
@@ -150,7 +150,7 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
             { tipo: "GANAR_ESPINAS", valorMin: 1, valorMax: 1 },
             { tipo: "GANAR_ESPINAS", valorMin: 1, valorMax: 1 },
             { tipo: "GANAR_ESPINAS", valorMin: 1, valorMax: 2 },
-            { tipo: "ATACAR", valorMin: 10, valorMax: 10 }
+            { tipo: "ATACAR", valorMin: 6, valorMax: 6 }
         ]
     },
     robot_dorado: {
@@ -159,13 +159,12 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         ambientacion: "BRAWL_STARS",
         categoria: "ELITE",
         espacio: 7,
-        hpMin: 85,
-        hpMax: 95,
+        hpMin: 96,
+        hpMax: 102,
         patron: [
             { tipo: "ATACAR", valorMin: 8, valorMax: 8 },
-            { tipo: "BLOQUEAR", valorMin: 10, valorMax: 10 },
+            { tipo: "BLOQUEAR", valorMin: 10, valorMax: 12 },
             { tipo: "GANAR_FUERZA", valorMin: 2, valorMax: 2 },
-            { tipo: "ATACAR_Y_BLOQUEAR", valorMin: 6, valorMax: 7 },
             { tipo: "ATACAR", valorMin: 5, valorMax: 5, golpes: 2 }
         ]
     },
@@ -385,7 +384,7 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
         hpMin: 78,
         hpMax: 84,
         patron: [
-            { tipo: "ATACAR", valorMin: 20, valorMax: 20 }
+            { tipo: "ATACAR", valorMin: 13, valorMax: 13 }
         ]
     },
     charizard: {
