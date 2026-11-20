@@ -60,6 +60,19 @@ export const CATALOGO_ANIMACIONES_ENTIDADES: Record<string, IConfigSpriteEntidad
             morir: { fila: 2, desdeCol: 0, hastaCol: 3, fps: 7, loop: false, mantenerUltimoFrame: true }
         }
     },
+    robot_pequeno: {
+        archivo: "robot_pequeno",
+        columnas: 7,
+        filas: 3,
+        tamano: { ancho: 95, alto: 95 },
+        voltearX: false,
+        animaciones: {
+            idle: { fila: 0, desdeCol: 0, hastaCol: 3, fps: 6, loop: true },
+            atacar: { fila: 1, desdeCol: 0, hastaCol: 3, fps: 10, loop: false },
+            recibir_danio: { fila: 2, desdeCol: 0, hastaCol: 1, fps: 8, loop: false },
+            morir: { fila: 2, desdeCol: 0, hastaCol: 6, fps: 9, loop: false, mantenerUltimoFrame: true }
+        }
+    },
 
     // Ejemplo de cómo definir tamaño distinto aunque todavía use placeholder o cuando sumes su sheet:
     // CROW: {
