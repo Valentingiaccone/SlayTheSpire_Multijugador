@@ -12,10 +12,16 @@ import {
 import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
 import { IEstadoSalaCliente } from "../../compartido/GameTypes";
 import {
-    CATALOGO_CARTAS,
     obtenerCartaMejorada,
+    obtenerDataCarta,
+    obtenerEncantamientoCarta,
+    puedeEncantarseCarta,
     puedeMejorarseCarta
 } from "../../compartido/Cartas";
+import {
+    CATALOGO_ENCANTAMIENTOS,
+    EncantamientoId
+} from "../../compartido/CondicionesYEfectos";
 import { CardView } from "./CardView";
 
 const { ccclass, property } = _decorator;
@@ -24,6 +30,8 @@ export type ModoVisorMazo =
     | "CONSULTA"
     | "FORJA"
     | "ELIMINAR"
+    | "ENCANTAR"
+    | "ELIMINAR_MULTI"
     | "PILA_ROBO"
     | "PILA_DESCARTE"
     | "PILA_AGOTADAS";
@@ -71,6 +79,10 @@ export class DeckViewerController extends Component {
         NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
     }
 
+    public esModoAccionReliquia(): boolean {
+        return this.modoActual === "ENCANTAR" || this.modoActual === "ELIMINAR_MULTI";
+    }
+
     public abrirModoConsulta(): void {
         this.configurarYAbrir("CONSULTA", null, null);
     }
@@ -99,9 +111,18 @@ export class DeckViewerController extends Component {
         this.configurarYAbrir("ELIMINAR", alConfirmarEliminar, alVolver);
     }
 
+    public abrirModoEncantarReliquia(): void {
+        this.configurarYAbrir("ENCANTAR", null, null);
+    }
+
+    public abrirModoEliminarMultipleReliquia(): void {
+        this.configurarYAbrir("ELIMINAR_MULTI", null, null);
+    }
+
     public cerrarVisor(): void {
         if (this.panelPrevisualizacion) this.panelPrevisualizacion.active = false;
         this.entradaSeleccionada = null;
+        this.modoActual = "CONSULTA";
         this.node.active = false;
     }
 
@@ -118,6 +139,9 @@ export class DeckViewerController extends Component {
         this.node.active = true;
         if (this.panelPrevisualizacion) {
             this.panelPrevisualizacion.active = false;
+        }
+        if (this.btnCerrar) {
+            this.btnCerrar.active = modo !== "ENCANTAR";
         }
 
         const state = NetworkManager.instance?.room?.state;
@@ -140,14 +164,17 @@ export class DeckViewerController extends Component {
         const miJugador = miId ? state.jugadores.get(miId) : undefined;
         if (!miJugador || !this.contenedorCartas || !this.prefabCarta) return;
 
+        if (this.btnCerrar) {
+            this.btnCerrar.active = this.modoActual !== "ENCANTAR";
+        }
+
         this.entradasMostradas = [];
 
         if (this.modoActual === "PILA_ROBO") {
             const copiaRobo = Array.from(miJugador.pilaRobo || []);
-            // Ordenamos alfabéticamente para no revelar el orden exacto de la próxima carta a robar
             copiaRobo.sort((a, b) => {
-                const nomA = CATALOGO_CARTAS[a]?.nombre || a;
-                const nomB = CATALOGO_CARTAS[b]?.nombre || b;
+                const nomA = obtenerDataCarta(a)?.nombre || a;
+                const nomB = obtenerDataCarta(b)?.nombre || b;
                 return nomA.localeCompare(nomB);
             });
             copiaRobo.forEach((cartaId, idx) => {
@@ -166,6 +193,10 @@ export class DeckViewerController extends Component {
             mazoCompleto.forEach((cartaId, indiceReal) => {
                 if (this.modoActual === "FORJA") {
                     if (puedeMejorarseCarta(cartaId)) {
+                        this.entradasMostradas.push({ indiceRealEnMazo: indiceReal, cartaId });
+                    }
+                } else if (this.modoActual === "ENCANTAR") {
+                    if (puedeEncantarseCarta(cartaId)) {
                         this.entradasMostradas.push({ indiceRealEnMazo: indiceReal, cartaId });
                     }
                 } else {
@@ -196,6 +227,15 @@ export class DeckViewerController extends Component {
                     break;
                 case "ELIMINAR":
                     this.labelTitulo.string = `🗑️ Seleccioná una carta para eliminar de tu mazo (${this.entradasMostradas.length} cartas)`;
+                    break;
+                case "ENCANTAR": {
+                    const encId = (miJugador.accionReliquiaPendienteParam || "GRATIS") as EncantamientoId;
+                    const nomEnc = CATALOGO_ENCANTAMIENTOS[encId]?.nombre || encId;
+                    this.labelTitulo.string = `✨ Pasaporte — Elegí una carta para encantar con "${nomEnc}" (${this.entradasMostradas.length} disponibles)`;
+                    break;
+                }
+                case "ELIMINAR_MULTI":
+                    this.labelTitulo.string = `🗑️ Tacho de basura — Podés eliminar hasta ${miJugador.accionReliquiaPendienteRestantes} carta(s) más (Cerrá para terminar)`;
                     break;
             }
         }
@@ -229,7 +269,7 @@ export class DeckViewerController extends Component {
             }
 
             const entrada = this.entradasMostradas[i];
-            const data = CATALOGO_CARTAS[entrada.cartaId];
+            const data = obtenerDataCarta(entrada.cartaId);
             if (!data) {
                 nodo.active = false;
                 return;
@@ -244,20 +284,29 @@ export class DeckViewerController extends Component {
             const y = -(this.MARGEN_SUPERIOR + fila * this.ESPACIO_Y);
             nodo.setPosition(x, y, 0);
 
+            const enc = obtenerEncantamientoCarta(entrada.cartaId);
             const cardView = nodo.getComponent(CardView);
-            cardView?.configurarModoEstatico(data, 0.88);
+            cardView?.configurarModoEstatico(data, 0.88, enc);
         });
     }
 
     private onClickCartaEnGrilla(indiceSlot: number) {
-        if (this.modoActual !== "FORJA" && this.modoActual !== "ELIMINAR") return;
+        if (
+            this.modoActual !== "FORJA" &&
+            this.modoActual !== "ELIMINAR" &&
+            this.modoActual !== "ENCANTAR" &&
+            this.modoActual !== "ELIMINAR_MULTI"
+        ) {
+            return;
+        }
 
         const entrada = this.entradasMostradas[indiceSlot];
         if (!entrada) return;
 
-        const dataActual = CATALOGO_CARTAS[entrada.cartaId];
+        const dataActual = obtenerDataCarta(entrada.cartaId);
         if (!dataActual) return;
 
+        const encActual = obtenerEncantamientoCarta(entrada.cartaId);
         this.entradaSeleccionada = entrada;
 
         if (this.modoActual === "FORJA") {
@@ -271,14 +320,14 @@ export class DeckViewerController extends Component {
                 }
                 if (this.cartaPreviewIzquierda) {
                     this.cartaPreviewIzquierda.node.active = true;
-                    this.cartaPreviewIzquierda.configurarModoEstatico(dataActual, 1);
+                    this.cartaPreviewIzquierda.configurarModoEstatico(dataActual, 1, encActual);
                 }
                 if (this.nodoFlechaMejora) {
                     this.nodoFlechaMejora.active = true;
                 }
                 if (this.cartaPreviewDerecha) {
                     this.cartaPreviewDerecha.node.active = true;
-                    this.cartaPreviewDerecha.configurarModoEstatico(dataMejorada, 1.05);
+                    this.cartaPreviewDerecha.configurarModoEstatico(dataMejorada, 1.05, encActual);
                 }
                 if (this.labelBtnConfirmar) {
                     this.labelBtnConfirmar.string = "Continuar (Forjar)";
@@ -286,7 +335,36 @@ export class DeckViewerController extends Component {
             } else {
                 this.onClickConfirmarPrevisualizacion();
             }
-        } else if (this.modoActual === "ELIMINAR") {
+        } else if (this.modoActual === "ENCANTAR") {
+            const state = NetworkManager.instance?.room?.state;
+            const miId = NetworkManager.instance?.room?.sessionId;
+            const miJugador = miId && state ? state.jugadores.get(miId) : undefined;
+            const encDestino = (miJugador?.accionReliquiaPendienteParam || "GRATIS") as EncantamientoId;
+            const nomEnc = CATALOGO_ENCANTAMIENTOS[encDestino]?.nombre || encDestino;
+
+            if (this.panelPrevisualizacion) {
+                this.panelPrevisualizacion.active = true;
+                if (this.labelTituloPrevisualizacion) {
+                    this.labelTituloPrevisualizacion.string = `✨ ¿Encantar ${dataActual.nombre} con "${nomEnc}"?`;
+                }
+                if (this.cartaPreviewIzquierda) {
+                    this.cartaPreviewIzquierda.node.active = true;
+                    this.cartaPreviewIzquierda.configurarModoEstatico(dataActual, 1, encActual);
+                }
+                if (this.nodoFlechaMejora) {
+                    this.nodoFlechaMejora.active = true;
+                }
+                if (this.cartaPreviewDerecha) {
+                    this.cartaPreviewDerecha.node.active = true;
+                    this.cartaPreviewDerecha.configurarModoEstatico(dataActual, 1.05, encDestino);
+                }
+                if (this.labelBtnConfirmar) {
+                    this.labelBtnConfirmar.string = "Confirmar Encantamiento";
+                }
+            } else {
+                this.onClickConfirmarPrevisualizacion();
+            }
+        } else if (this.modoActual === "ELIMINAR" || this.modoActual === "ELIMINAR_MULTI") {
             if (this.panelPrevisualizacion) {
                 this.panelPrevisualizacion.active = true;
                 if (this.labelTituloPrevisualizacion) {
@@ -294,7 +372,7 @@ export class DeckViewerController extends Component {
                 }
                 if (this.cartaPreviewIzquierda) {
                     this.cartaPreviewIzquierda.node.active = true;
-                    this.cartaPreviewIzquierda.configurarModoEstatico(dataActual, 1);
+                    this.cartaPreviewIzquierda.configurarModoEstatico(dataActual, 1, encActual);
                 }
                 if (this.nodoFlechaMejora) {
                     this.nodoFlechaMejora.active = false;
@@ -314,6 +392,16 @@ export class DeckViewerController extends Component {
     public onClickConfirmarPrevisualizacion() {
         if (!this.entradaSeleccionada) return;
         const { indiceRealEnMazo, cartaId } = this.entradaSeleccionada;
+
+        if (this.modoActual === "ENCANTAR" || this.modoActual === "ELIMINAR_MULTI") {
+            this.entradaSeleccionada = null;
+            if (this.panelPrevisualizacion) {
+                this.panelPrevisualizacion.active = false;
+            }
+            NetworkManager.instance?.resolverAccionReliquia(indiceRealEnMazo, false);
+            return;
+        }
+
         const callback = this.alConfirmarCartaCallback;
         this.cerrarVisor();
         callback?.(indiceRealEnMazo, cartaId);
@@ -327,6 +415,14 @@ export class DeckViewerController extends Component {
     }
 
     public onClickCerrarVisor() {
+        if (this.modoActual === "ENCANTAR") return;
+
+        if (this.modoActual === "ELIMINAR_MULTI") {
+            NetworkManager.instance?.resolverAccionReliquia(undefined, true);
+            this.cerrarVisor();
+            return;
+        }
+
         const callbackCancelar = this.alCancelarCallback;
         this.cerrarVisor();
         callbackCancelar?.();

@@ -17,6 +17,7 @@ import { CampfireService } from "./services/CampfireService";
 import { ShopService } from "./services/ShopService";
 import { EventService } from "./services/EventService";
 import { CombatCoordinator } from "./services/CombatCoordinator";
+import { RelicEngine } from "../engine/RelicEngine";
 
 export class SpireRoom extends Room<SpireState> {
     maxClients = 4;
@@ -203,6 +204,15 @@ export class SpireRoom extends Room<SpireState> {
             this.eventService.registrarVotoComunitario(client.sessionId, data.indiceOpcion);
         });
 
+        this.onMessage(
+            MENSAJES.RESOLVER_ACCION_RELIQUIA,
+            (client, data: { indiceMazo?: number; terminar?: boolean }) => {
+                const jugador = this.state.jugadores.get(client.sessionId);
+                if (!jugador) return;
+                RelicEngine.resolverAccionPendiente(jugador, data || {});
+            }
+        );
+
         this.onMessage(MENSAJES.REINICIAR_PARTIDA, (client) => {
             if (!this.state.jugadores.has(client.sessionId)) return;
             if (this.state.faseActual !== "VICTORY" && this.state.faseActual !== "DEFEAT") return;
@@ -216,6 +226,7 @@ export class SpireRoom extends Room<SpireState> {
             this.state.nodoActualId = "";
             this.state.esCombateElite = false;
             this.state.esCombateJefe = false;
+            this.state.combateFinalizando = false;
             this.state.nodosMapa.clear();
             this.state.enemigos.clear();
 
@@ -234,12 +245,18 @@ export class SpireRoom extends Room<SpireState> {
                 j.eventoOpcionReliquias.clear();
                 j.eventoOpcionMaldiciones.clear();
                 j.reliquias.clear();
+                j.contadoresReliquias.clear();
+                j.accionReliquiaPendienteTipo = "";
+                j.accionReliquiaPendienteParam = "";
+                j.accionReliquiaPendienteRestantes = 0;
+                j.colaAccionesReliquiaPendientes = [];
                 j.aplicarDatosPersonaje(j.personajeId);
             });
 
             this.state.faseActual = "LOBBY";
         });
 
+        // Atajos de teclado para testeo local rápido (Teclas 1 a 6)
         this.onMessage("debug_comando", (client, data: { accion: string }) => {
             const jugador = this.state.jugadores.get(client.sessionId);
             if (!jugador || !data?.accion) return;
@@ -295,9 +312,15 @@ export class SpireRoom extends Room<SpireState> {
             obtenerMazoInicial(j.personajeId).forEach((id) => j.mazoMaestro.push(id));
 
             j.reliquias.clear();
+            j.contadoresReliquias.clear();
+            j.accionReliquiaPendienteTipo = "";
+            j.accionReliquiaPendienteParam = "";
+            j.accionReliquiaPendienteRestantes = 0;
+            j.colaAccionesReliquiaPendientes = [];
+
             const info = PERSONAJES_INFO[j.personajeId];
             if (info?.reliquiaInicial) {
-                j.reliquias.push(info.reliquiaInicial);
+                RelicEngine.otorgarReliquia(this.state, j, info.reliquiaInicial, false);
             }
             j.nodoVotadoId = "";
         });

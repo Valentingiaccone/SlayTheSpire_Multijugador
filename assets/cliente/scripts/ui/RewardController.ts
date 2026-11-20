@@ -1,7 +1,7 @@
 import { _decorator, Component, Node, Label, Button, Sprite, Color, instantiate } from "cc";
 import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
 import { IEstadoSalaCliente } from "../../compartido/GameTypes";
-import { CATALOGO_CARTAS } from "../../compartido/Cartas";
+import { obtenerDataCarta } from "../../compartido/Cartas";
 import { CATALOGO_RELIQUIAS } from "../../compartido/Reliquias";
 import { SpriteManager } from "../utils/SpriteManager";
 import { CardView } from "./CardView";
@@ -18,7 +18,6 @@ export class RewardController extends Component {
     @property(Sprite) spriteReliquiaElite: Sprite = null!;
     @property(Label) labelReliquiaElite: Label = null!;
 
-    // Botón/Nodo seleccionable para agarrar o dejar el Oro de recompensa
     @property(Node) contenedorOroRecompensa: Node = null!;
     @property(Label) labelOroRecompensa: Label = null!;
 
@@ -98,7 +97,7 @@ export class RewardController extends Component {
         this.renderizarCartas(this.opcionesActuales);
         this.renderizarReliquiaElite(miJugador.reliquiaRecompensa);
         this.renderizarOroRecompensa(miJugador.oroRecompensa);
-        this.actualizarTextoBotonContinuar();
+        this.actualizarTextoBotonContinuar()
     }
 
     private renderizarCartas(opciones: string[]) {
@@ -127,7 +126,7 @@ export class RewardController extends Component {
             }
 
             const cartaId = opciones[i];
-            const data = CATALOGO_CARTAS[cartaId];
+            const data = obtenerDataCarta(cartaId);
             if (!data) {
                 nodo.active = false;
                 return;
@@ -151,7 +150,12 @@ export class RewardController extends Component {
 
         this.contenedorReliquiaElite.active = true;
         if (this.spriteReliquiaElite) {
-            SpriteManager.aplicarSprite(this.spriteReliquiaElite, "reliquias", dataReliquia.icono);
+            void SpriteManager.aplicarSprite(
+                this.spriteReliquiaElite,
+                "reliquias",
+                dataReliquia.icono,
+                "generico"
+            );
             this.spriteReliquiaElite.color = this.reliquiaSeleccionada
                 ? new Color(130, 255, 150)
                 : new Color(255, 255, 255);
@@ -159,7 +163,7 @@ export class RewardController extends Component {
 
         if (this.labelReliquiaElite) {
             const tag = this.reliquiaSeleccionada ? "✅ [SELECCIONADA]" : "[Clic para seleccionar]";
-            this.labelReliquiaElite.string = `${dataReliquia.nombre} ${tag}\n${dataReliquia.descripcion}`;
+            this.labelReliquiaElite.string = `${dataReliquia.nombre} [${dataReliquia.calidad}] ${tag}\n${dataReliquia.descripcion}`;
         }
     }
 

@@ -116,6 +116,10 @@ export class NetworkManager extends Component {
         this.room?.send(MENSAJES.VOTAR_OPCION_EVENTO, { indiceOpcion });
     }
 
+    public resolverAccionReliquia(indiceMazo?: number, terminar: boolean = false) {
+        this.room?.send(MENSAJES.RESOLVER_ACCION_RELIQUIA, { indiceMazo, terminar });
+    }
+
     public reiniciarPartida() {
         this.room?.send(MENSAJES.REINICIAR_PARTIDA);
     }

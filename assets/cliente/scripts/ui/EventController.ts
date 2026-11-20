@@ -14,7 +14,7 @@ import {
     opcionRequiereElegirCartaMazo,
     validarRequisitosOpcionParaJugador
 } from "../../compartido/Eventos";
-import { CATALOGO_CARTAS } from "../../compartido/Cartas";
+import { obtenerDataCarta } from "../../compartido/Cartas";
 import { CATALOGO_RELIQUIAS } from "../../compartido/Reliquias";
 import { SpriteManager } from "../utils/SpriteManager";
 import { CardView } from "./CardView";
@@ -108,7 +108,9 @@ export class EventController extends Component {
             this.nodosOpciones.forEach((n) => (n.active = false));
             if (this.btnContinuarIndividual) this.btnContinuarIndividual.node.active = false;
             if (this.contenedorPrevisualizacion) this.contenedorPrevisualizacion.active = false;
-            this.visorMazo?.cerrarVisor();
+            if (this.visorMazo && !this.visorMazo.esModoAccionReliquia()) {
+                this.visorMazo.cerrarVisor();
+            }
             return;
         }
 
@@ -347,8 +349,8 @@ export class EventController extends Component {
         const reliquiaId = miJugador.eventoOpcionReliquias?.[idxOpcion] || "";
         const maldicionId = miJugador.eventoOpcionMaldiciones?.[idxOpcion] || "";
 
-        const dataCarta = cartaId ? CATALOGO_CARTAS[cartaId] : undefined;
-        const dataMaldicion = maldicionId ? CATALOGO_CARTAS[maldicionId] : undefined;
+        const dataCarta = cartaId ? obtenerDataCarta(cartaId) : undefined;
+        const dataMaldicion = maldicionId ? obtenerDataCarta(maldicionId) : undefined;
         const dataReliquia = reliquiaId ? CATALOGO_RELIQUIAS[reliquiaId] : undefined;
 
         const hayAlgoParaMostrar = Boolean(dataCarta || dataMaldicion || dataReliquia);
@@ -373,14 +375,15 @@ export class EventController extends Component {
             this.nodoReliquiaPreview.active = Boolean(dataReliquia);
             if (dataReliquia) {
                 if (this.spriteReliquiaPreview) {
-                    SpriteManager.aplicarSprite(
+                    void SpriteManager.aplicarSprite(
                         this.spriteReliquiaPreview,
                         "reliquias",
-                        dataReliquia.icono
+                        dataReliquia.icono,
+                        "generico"
                     );
                 }
                 if (this.labelReliquiaPreview) {
-                    this.labelReliquiaPreview.string = `${dataReliquia.nombre}\n${dataReliquia.descripcion}`;
+                    this.labelReliquiaPreview.string = `${dataReliquia.nombre} [${dataReliquia.calidad}]\n${dataReliquia.descripcion}`;
                 }
             }
         }

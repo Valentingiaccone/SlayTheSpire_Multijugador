@@ -8,6 +8,9 @@ import {
     obtenerPrecioReliquia
 } from "../../../../assets/cliente/compartido/Reliquias";
 import { ECONOMIA_CONFIG } from "../../../../assets/cliente/compartido/GameTypes";
+import { RelicEngine } from "../../engine/RelicEngine";
+import { PlayerStatsHelper } from "../../engine/PlayerStatsHelper";
+import { CombatEngine } from "../../engine/CombatEngine";
 
 export class ShopService {
     constructor(
@@ -35,7 +38,8 @@ export class ShopService {
             const reliquiasOferta = obtenerReliquiasRecompensa(
                 this.state.jugadores,
                 3,
-                jugador.personajeId
+                jugador.personajeId,
+                "TIENDA"
             );
             reliquiasOferta.forEach((rId) => jugador.tiendaReliquias.push(rId));
         });
@@ -55,9 +59,12 @@ export class ShopService {
         const precio = obtenerPrecioCarta(cartaId);
         if (jugador.oro < precio) return;
 
-        jugador.oro -= precio;
+        PlayerStatsHelper.modificarOro(jugador, -precio);
         jugador.mazoMaestro.push(cartaId);
-        jugador.tiendaCartas.splice(indiceTienda, 1);
+
+        const stockRestante = Array.from(jugador.tiendaCartas);
+        stockRestante.splice(indiceTienda, 1);
+        CombatEngine.sincronizarArraySchema(jugador.tiendaCartas, stockRestante);
     }
 
     public comprarReliquia(sessionId: string, indiceReliquia: number): void {
@@ -72,9 +79,13 @@ export class ShopService {
         const precio = obtenerPrecioReliquia(reliquiaId);
         if (jugador.oro < precio) return;
 
-        jugador.oro -= precio;
-        jugador.reliquias.push(reliquiaId);
-        jugador.tiendaReliquias.splice(indiceReliquia, 1);
+        PlayerStatsHelper.modificarOro(jugador, -precio);
+
+        const stockRestante = Array.from(jugador.tiendaReliquias);
+        stockRestante.splice(indiceReliquia, 1);
+        CombatEngine.sincronizarArraySchema(jugador.tiendaReliquias, stockRestante);
+
+        RelicEngine.otorgarReliquia(this.state, jugador, reliquiaId, true);
     }
 
     public eliminarCartaMazo(sessionId: string, indiceMazo: number): void {
@@ -87,8 +98,12 @@ export class ShopService {
         const costo = ECONOMIA_CONFIG.COSTO_ELIMINAR_CARTA_TIENDA;
         if (jugador.oro < costo) return;
 
-        jugador.oro -= costo;
-        jugador.mazoMaestro.splice(indiceMazo, 1);
+        PlayerStatsHelper.modificarOro(jugador, -costo);
+
+        const mazoTemp = Array.from(jugador.mazoMaestro);
+        mazoTemp.splice(indiceMazo, 1);
+        CombatEngine.sincronizarArraySchema(jugador.mazoMaestro, mazoTemp);
+
         jugador.tiendaEliminacionUsada = true;
     }
 

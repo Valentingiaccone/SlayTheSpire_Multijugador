@@ -1,6 +1,7 @@
 export type EstadoId =
     | "FUERZA"
     | "FUERZA_TEMPORAL"
+    | "DESTREZA"
     | "VULNERABLE"
     | "DEBIL"
     | "ESPINAS"
@@ -27,6 +28,24 @@ export type FuenteDanio =
     | "VENENO"
     | "EFECTO_DIRECTO";
 
+export type EncantamientoId = "GRATIS";
+
+export interface IInfoEncantamiento {
+    id: EncantamientoId;
+    nombre: string;
+    descripcion: string;
+    sprite: string;
+}
+
+export const CATALOGO_ENCANTAMIENTOS: Record<EncantamientoId, IInfoEncantamiento> = {
+    GRATIS: {
+        id: "GRATIS",
+        nombre: "Gratis",
+        descripcion: "El costo de energía de esta carta es 0 permanentemente.",
+        sprite: "encantamiento_gratis"
+    }
+};
+
 export type DescriptorCondicion =
     | { tipo: "TURNO_MULTIPLO"; divisor: number }
     | { tipo: "TURNO_EXACTO"; turno: number }
@@ -35,6 +54,10 @@ export type DescriptorCondicion =
     | { tipo: "ATAQUES_TURNO_IGUAL"; cantidad: number }
     | { tipo: "DANIO_RECIBIDO_MAYOR_A"; minimo: number }
     | { tipo: "ORO_MINIMO"; minimo: number }
+    | { tipo: "ORO_MENOR_A"; maximoExclusivo: number }
+    | { tipo: "HP_PORCENTAJE_MENOR_A"; porcentaje: number }
+    | { tipo: "ES_COMBATE_JEFE" }
+    | { tipo: "CARTA_TIPO_ES"; tipoCarta: "ATAQUE" | "HABILIDAD" | "PODER" | "MALDICION" }
     | { tipo: "TIENE_ESTADO"; objetivo: TipoObjetivo; estadoId: EstadoId; minimo?: number };
 
 export type DescriptorEfecto =
@@ -102,6 +125,20 @@ export type DescriptorEfecto =
           tipo: "FUERZA_POR_CADA_ORO";
           cadaCuantoOro: number;
           fuerzaGanada: number;
+      }
+    | {
+          tipo: "BLOQUEO_POR_ORO";
+          cadaCuantoOro: number;
+          bloqueoPorTramo: number;
+      }
+    | {
+          tipo: "BLOQUEO_POR_CARTAS_MAZO";
+          cadaCuantasCartas: number;
+          bloqueoPorTramo: number;
+      }
+    | {
+          tipo: "HACER_CARTA_MANO_GRATIS_TURNO";
+          cantidad: number;
       }
     | {
           tipo: "ORO_POR_HP_FALTANTE_ENEMIGO";

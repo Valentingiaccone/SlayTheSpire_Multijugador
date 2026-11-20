@@ -138,7 +138,7 @@ export class ChestController extends Component {
                     .map((pId) => PERSONAJES_INFO[pId]?.nombre || pId)
                     .join(", ");
                 const txtVotos = votantes.length > 0 ? `\n👤 Elegida por: ${nombresVotantes}` : "";
-                label.string = `${data.nombre}\n${data.descripcion}${txtVotos}`;
+                label.string = `${data.nombre} [${data.calidad}]\n${data.descripcion}${txtVotos}`;
                 label.color =
                     votantes.length > 1
                         ? new Color(255, 110, 110)
@@ -149,7 +149,7 @@ export class ChestController extends Component {
 
             const sprite = nodo.getComponentInChildren(Sprite);
             if (sprite) {
-                SpriteManager.aplicarSprite(sprite, "reliquias", data.icono);
+                void SpriteManager.aplicarSprite(sprite, "reliquias", data.icono, "generico");
             }
         });
     }

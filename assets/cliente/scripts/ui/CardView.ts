@@ -1,6 +1,10 @@
 import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite, Color } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
 import {
+    CATALOGO_ENCANTAMIENTOS,
+    EncantamientoId
+} from "../../compartido/CondicionesYEfectos";
+import {
     CalculadoraCombate,
     IContextoCalculoCarta,
     IMapaEstadosLectura
@@ -16,9 +20,11 @@ export class CardView extends Component {
     @property(Label) labelDescripcion: Label = null!;
     @property(Label) labelTipo: Label = null!;
     @property(Sprite) imagen: Sprite = null!;
+    @property(Node) nodoEncantado: Node = null!;
 
     private indiceMano: number = -1;
     private cartaData: ICartaData | null = null;
+    private ultimoSpriteEncantamiento: string = "";
     private posOriginal: Vec3 = new Vec3();
     private arrastrando: boolean = false;
     private arrastreHabilitado: boolean = true;
@@ -42,6 +48,11 @@ export class CardView extends Component {
         this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
     }
 
+    onDisable() {
+        this.arrastrando = false;
+        this.ultimoObjetivoHoverId = undefined;
+    }
+
     public configurar(
         indice: number,
         data: ICartaData,
@@ -51,7 +62,9 @@ export class CardView extends Component {
         estadosLanzador?: IMapaEstadosLectura,
         obtenerEstadosObjetivo?: (objetivoId: string) => IMapaEstadosLectura | undefined,
         permitirArrastre: boolean = true,
-        contextoExtra?: IContextoCalculoCarta
+        contextoExtra?: IContextoCalculoCarta,
+        encantamiento?: EncantamientoId,
+        gratisEsteTurno: boolean = false
     ) {
         this.indiceMano = indice;
         this.onSolicitarJugar = onJugar;
@@ -76,7 +89,9 @@ export class CardView extends Component {
         const costoMostrado = CalculadoraCombate.calcularCostoCarta(
             data.costo,
             data.reduccionCostoPorHpPerdido,
-            contextoExtra?.hpPerdidoCombate || 0
+            contextoExtra?.hpPerdidoCombate || 0,
+            encantamiento,
+            gratisEsteTurno
         );
 
         if (this.labelCosto) {
@@ -100,6 +115,7 @@ export class CardView extends Component {
 
         if (this.labelTipo) this.labelTipo.string = data.tipo;
 
+        this.actualizarVisualEncantamiento(encantamiento);
         this.refrescarTextoDinamico(undefined);
 
         const jugableVisual = puedePagarse && !data.injugable;
@@ -107,11 +123,15 @@ export class CardView extends Component {
         this.node.setScale(escala, escala, 1);
 
         if (cambioDeSprite) {
-            SpriteManager.aplicarSprite(this.imagen, "cartas", data.sprite);
+            void SpriteManager.aplicarSprite(this.imagen, "cartas", data.sprite);
         }
     }
 
-    public configurarModoEstatico(data: ICartaData, escala: number = 1) {
+    public configurarModoEstatico(
+        data: ICartaData,
+        escala: number = 1,
+        encantamiento?: EncantamientoId
+    ) {
         this.arrastrando = false;
         this.ultimoObjetivoHoverId = undefined;
         this.configurar(
@@ -123,9 +143,37 @@ export class CardView extends Component {
             undefined,
             undefined,
             false,
-            undefined
+            undefined,
+            encantamiento,
+            false
         );
         this.node.setScale(escala, escala, 1);
+    }
+
+    private actualizarVisualEncantamiento(encantamiento?: EncantamientoId) {
+        if (!this.nodoEncantado) return;
+
+        const infoEnc = encantamiento ? CATALOGO_ENCANTAMIENTOS[encantamiento] : undefined;
+        if (!infoEnc) {
+            this.nodoEncantado.active = false;
+            return;
+        }
+
+        this.nodoEncantado.active = true;
+        if (this.ultimoSpriteEncantamiento !== infoEnc.sprite) {
+            this.ultimoSpriteEncantamiento = infoEnc.sprite;
+            const spEnc =
+                this.nodoEncantado.getComponent(Sprite) ||
+                this.nodoEncantado.getComponentInChildren(Sprite);
+            if (spEnc) {
+                void SpriteManager.aplicarSprite(
+                    spEnc,
+                    "encantamientos",
+                    infoEnc.sprite,
+                    "generico"
+                );
+            }
+        }
     }
 
     private refrescarTextoDinamico(estadosObjetivo?: IMapaEstadosLectura) {
@@ -202,10 +250,5 @@ export class CardView extends Component {
                 this.onSolicitarJugar?.(this.indiceMano, objetivoId);
             }
         }
-    }
-
-    onDisable() {
-        this.arrastrando = false;
-        this.ultimoObjetivoHoverId = undefined;
     }
 }

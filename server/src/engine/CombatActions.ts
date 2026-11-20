@@ -2,8 +2,10 @@ import { SpireState, PlayerState, EnemyState } from "../rooms/schema/SpireState"
 import { EstadoId, FuenteDanio } from "../../../assets/cliente/compartido/CondicionesYEfectos";
 import { CalculadoraCombate } from "../../../assets/cliente/compartido/CalculadoraCombate";
 import { CONFIG_MAPA } from "../../../assets/cliente/compartido/Mapa";
+import { FaseSala } from "../../../assets/cliente/compartido/GameTypes";
 import { ActionQueue, IAccionCombate } from "./ActionQueue";
 import { CombatEventBus, EntidadCombate } from "./CombatEventBus";
+import { PlayerStatsHelper } from "./PlayerStatsHelper";
 
 export function obtenerIdEntidad(entidad: EntidadCombate): string {
     return entidad instanceof PlayerState ? entidad.sessionId : entidad.uid;
@@ -19,19 +21,7 @@ export class AccionModificarOro implements IAccionCombate {
     constructor(private jugador: PlayerState, private delta: number) {}
 
     ejecutar(_state: SpireState, cola: ActionQueue): void {
-        if (this.delta === 0) return;
-        const antes = this.jugador.oro;
-        this.jugador.oro = Math.max(0, this.jugador.oro + this.delta);
-        const cambioReal = this.jugador.oro - antes;
-
-        if (cambioReal !== 0) {
-            cola.emitirVisual({
-                tipo: "ORO_CAMBIADO",
-                jugadorId: this.jugador.sessionId,
-                delta: cambioReal,
-                oroTotal: this.jugador.oro
-            });
-        }
+        PlayerStatsHelper.modificarOro(this.jugador, this.delta, cola);
     }
 }
 
@@ -42,12 +32,21 @@ export class AccionPerderHp implements IAccionCombate {
         private autor?: EntidadCombate
     ) {}
 
-    ejecutar(_state: SpireState, cola: ActionQueue): void {
+    ejecutar(state: SpireState, cola: ActionQueue): void {
         if (this.objetivo.hp <= 0 || this.cantidad <= 0) return;
 
-        const antes = this.objetivo.hp;
-        this.objetivo.hp = Math.max(0, this.objetivo.hp - this.cantidad);
-        const perdidoReal = antes - this.objetivo.hp;
+        let perdidoReal = 0;
+        if (this.objetivo instanceof PlayerState) {
+            const res = PlayerStatsHelper.aplicarPerdidaHpJugador(state, this.objetivo, this.cantidad, {
+                permitirMuerte: true,
+                cola
+            });
+            perdidoReal = res.hpPerdidoReal;
+        } else {
+            const antes = this.objetivo.hp;
+            this.objetivo.hp = Math.max(0, this.objetivo.hp - this.cantidad);
+            perdidoReal = antes - this.objetivo.hp;
+        }
 
         cola.emitirVisual({
             tipo: "IMPACTO_DANIO",
@@ -59,15 +58,6 @@ export class AccionPerderHp implements IAccionCombate {
             bloqueoRestante: this.objetivo.bloqueo,
             fuente: "EFECTO_DIRECTO"
         });
-
-        if (this.objetivo instanceof PlayerState && perdidoReal > 0) {
-            this.objetivo.hpPerdidoCombate += perdidoReal;
-
-            const avaricia = this.objetivo.estados.get("AVARICIA") || 0;
-            if (avaricia > 0) {
-                cola.encolarAlInicio(new AccionModificarOro(this.objetivo, perdidoReal * avaricia));
-            }
-        }
 
         if (this.objetivo.hp <= 0) {
             cola.encolarAlInicio(new AccionProcesarMuerte(this.objetivo, this.autor));
@@ -107,34 +97,33 @@ export class AccionAplicarDanio implements IAccionCombate {
 
         const ignoraBloqueo = this.fuente === "VENENO";
         const danioBloqueado = ignoraBloqueo ? 0 : Math.min(this.defensor.bloqueo, monto);
-        const danioAlHp = Math.max(0, monto - danioBloqueado);
+        const danioRestante = Math.max(0, monto - danioBloqueado);
 
-        const hpAntes = this.defensor.hp;
         this.defensor.bloqueo = Math.max(0, this.defensor.bloqueo - danioBloqueado);
-        this.defensor.hp = Math.max(0, this.defensor.hp - danioAlHp);
-        const hpPerdidoReal = hpAntes - this.defensor.hp;
+
+        let hpPerdidoReal = 0;
+        if (this.defensor instanceof PlayerState) {
+            const res = PlayerStatsHelper.aplicarPerdidaHpJugador(state, this.defensor, danioRestante, {
+                permitirMuerte: true,
+                cola
+            });
+            hpPerdidoReal = res.hpPerdidoReal;
+        } else {
+            const hpAntes = this.defensor.hp;
+            this.defensor.hp = Math.max(0, this.defensor.hp - danioRestante);
+            hpPerdidoReal = hpAntes - this.defensor.hp;
+        }
 
         cola.emitirVisual({
             tipo: "IMPACTO_DANIO",
             objetivoId: obtenerIdEntidad(this.defensor),
             atacanteId: this.atacante ? obtenerIdEntidad(this.atacante) : undefined,
-            danioAlHp,
+            danioAlHp: hpPerdidoReal,
             danioBloqueado,
             hpRestante: this.defensor.hp,
             bloqueoRestante: this.defensor.bloqueo,
             fuente: this.fuente
         });
-
-        if (this.defensor instanceof PlayerState && hpPerdidoReal > 0) {
-            this.defensor.hpPerdidoCombate += hpPerdidoReal;
-
-            const avaricia = this.defensor.estados.get("AVARICIA") || 0;
-            if (avaricia > 0) {
-                cola.encolarAlInicio(
-                    new AccionModificarOro(this.defensor, hpPerdidoReal * avaricia)
-                );
-            }
-        }
 
         if (this.atacante instanceof PlayerState && this.defensor instanceof EnemyState) {
             if (hpPerdidoReal > 0 && this.extra.oroPorGolpeAlHp && this.extra.oroPorGolpeAlHp > 0) {
@@ -155,13 +144,13 @@ export class AccionAplicarDanio implements IAccionCombate {
             this.atacante instanceof EnemyState &&
             this.fuente === "ATAQUE_ENEMIGO"
         ) {
-            if (danioAlHp > 0) {
+            if (hpPerdidoReal > 0) {
                 bus.emitir("AL_RECIBIR_DANIO", {
                     state,
                     cola,
                     defensor: this.defensor,
                     atacante: this.atacante,
-                    danioRecibido: danioAlHp,
+                    danioRecibido: hpPerdidoReal,
                     fuente: this.fuente
                 });
             }
@@ -179,18 +168,17 @@ export class AccionAplicarDanio implements IAccionCombate {
             this.defensor instanceof EnemyState &&
             this.fuente === "ATAQUE_CARTA"
         ) {
-            if (danioAlHp > 0 && this.defensor.hp > 0) {
+            if (hpPerdidoReal > 0 && this.defensor.hp > 0) {
                 bus.emitir("AL_INFLIGIR_DANIO", {
                     state,
                     cola,
                     atacante: this.atacante,
                     defensor: this.defensor,
-                    danioInfligido: danioAlHp,
+                    danioInfligido: hpPerdidoReal,
                     fuente: this.fuente
                 });
             }
 
-            // Si el enemigo atacado tiene ESPINAS (ej: Cactus, Espíritu de fuego/eléctrico), devuelve daño al jugador
             const espinasEnemigo = this.defensor.estados.get("ESPINAS") || 0;
             if (espinasEnemigo > 0 && this.atacante.hp > 0) {
                 cola.encolarAlInicio(
@@ -206,16 +194,25 @@ export class AccionAplicarDanio implements IAccionCombate {
 }
 
 export class AccionGanarBloqueo implements IAccionCombate {
-    constructor(private objetivo: EntidadCombate, private valor: number) {}
+    constructor(
+        private objetivo: EntidadCombate,
+        private valor: number,
+        private lanzadorParaDestreza?: PlayerState
+    ) {}
 
     ejecutar(_state: SpireState, cola: ActionQueue): void {
-        if (this.objetivo.hp <= 0 || this.valor <= 0) return;
-        this.objetivo.bloqueo += this.valor;
+        if (this.objetivo.hp <= 0) return;
+        const montoFinal = this.lanzadorParaDestreza
+            ? CalculadoraCombate.calcularBloqueo(this.valor, this.lanzadorParaDestreza.estados)
+            : Math.max(0, this.valor);
+
+        if (montoFinal <= 0) return;
+        this.objetivo.bloqueo += montoFinal;
 
         cola.emitirVisual({
             tipo: "BLOQUEO_GANADO",
             entidadId: obtenerIdEntidad(this.objetivo),
-            cantidad: this.valor,
+            cantidad: montoFinal,
             bloqueoTotal: this.objetivo.bloqueo
         });
     }
@@ -340,16 +337,28 @@ export class AccionProcesarMuerte implements IAccionCombate {
     }
 }
 
+class AccionFinalizarFaseCombate implements IAccionCombate {
+    constructor(private faseDestino: FaseSala) {}
+
+    ejecutar(state: SpireState): void {
+        state.combateFinalizando = false;
+        state.faseActual = this.faseDestino;
+    }
+}
+
 export class AccionVerificarFinCombate implements IAccionCombate {
     ejecutar(state: SpireState, cola: ActionQueue, bus: CombatEventBus): void {
-        if (state.faseActual !== "COMBAT") return;
+        if (state.faseActual !== "COMBAT" || state.combateFinalizando) return;
 
         const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
         if (!quedaEnemigoVivo) {
+            // Marcamos finalización y dejamos que AL_FINALIZAR_COMBATE (Bandita, Megahucha, Chuleta)
+            // resuelva todas sus acciones encoladas ANTES de cambiar faseActual
+            state.combateFinalizando = true;
             bus.emitir("AL_FINALIZAR_COMBATE", { state, cola });
             const esJefeFinalRun =
                 state.esCombateJefe && state.mapaActual >= CONFIG_MAPA.TOTAL_MAPAS;
-            state.faseActual = esJefeFinalRun ? "VICTORY" : "REWARD";
+            cola.encolarAlFinal(new AccionFinalizarFaseCombate(esJefeFinalRun ? "VICTORY" : "REWARD"));
             return;
         }
 

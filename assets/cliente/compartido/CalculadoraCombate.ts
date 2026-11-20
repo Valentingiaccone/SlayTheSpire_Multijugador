@@ -1,4 +1,4 @@
-import { EstadoId, DescriptorEfecto } from "./CondicionesYEfectos";
+import { EstadoId, DescriptorEfecto, EncantamientoId } from "./CondicionesYEfectos";
 
 export interface IMapaEstadosLectura {
     get?(clave: string): number | undefined;
@@ -29,8 +29,11 @@ export class CalculadoraCombate {
     public static calcularCostoCarta(
         costoBase: number,
         reduccionPorHpPerdido?: boolean,
-        hpPerdidoCombate: number = 0
+        hpPerdidoCombate: number = 0,
+        encantamiento?: EncantamientoId,
+        gratisEsteTurno: boolean = false
     ): number {
+        if (encantamiento === "GRATIS" || gratisEsteTurno) return 0;
         if (!reduccionPorHpPerdido) return costoBase;
         return Math.max(0, costoBase - Math.max(0, hpPerdidoCombate));
     }
@@ -57,9 +60,10 @@ export class CalculadoraCombate {
 
     public static calcularBloqueo(
         bloqueoBase: number,
-        _estadosLanzador?: IMapaEstadosLectura
+        estadosLanzador?: IMapaEstadosLectura
     ): number {
-        return Math.max(0, bloqueoBase);
+        const destreza = this.leerEstado(estadosLanzador, "DESTREZA");
+        return Math.max(0, bloqueoBase + destreza);
     }
 
     public static formatearDescripcionCarta(

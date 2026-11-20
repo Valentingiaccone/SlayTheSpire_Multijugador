@@ -353,7 +353,7 @@
     },
     "_enabled": true,
     "__prefab": null,
-    "usarServidorLocal": false,
+    "usarServidorLocal": true,
     "_id": "1eRxIO3a1J+4RyLodELL89"
   },
   {
@@ -12388,6 +12388,7 @@
     "imagen": {
       "__id__": 322
     },
+    "nodoEncantado": null,
     "_id": "1dDC/lBm5F6p+tXc7LAZoy"
   },
   {

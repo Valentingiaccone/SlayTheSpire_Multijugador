@@ -2,6 +2,7 @@ import { Clock, Delayed } from "colyseus";
 import { SpireState } from "../schema/SpireState";
 import { obtenerReliquiasRecompensa } from "../../../../assets/cliente/compartido/Reliquias";
 import { CONFIG_MAPA } from "../../../../assets/cliente/compartido/Mapa";
+import { RelicEngine } from "../../engine/RelicEngine";
 
 export class ChestService {
     private timerCofre: Delayed | null = null;
@@ -31,7 +32,14 @@ export class ChestService {
         this.state.reliquiasCofre.clear();
 
         const cantJugadores = Math.max(1, this.state.jugadores.size);
-        const reliquiasGeneradas = obtenerReliquiasRecompensa(this.state.jugadores, cantJugadores);
+        const forzarLegendaria = RelicEngine.consumirCargasCofreLegendario(this.state);
+        const reliquiasGeneradas = obtenerReliquiasRecompensa(
+            this.state.jugadores,
+            cantJugadores,
+            undefined,
+            "COFRE",
+            forzarLegendaria ? "LEGENDARIA" : undefined
+        );
         reliquiasGeneradas.forEach((rId) => this.state.reliquiasCofre.push(rId));
     }
 
@@ -114,8 +122,9 @@ export class ChestService {
     private entregarReliquiasYAvanzar(): void {
         this.state.jugadores.forEach((j) => {
             if (j.reliquiaCofreVotadaId) {
-                j.reliquias.push(j.reliquiaCofreVotadaId);
+                const relId = j.reliquiaCofreVotadaId;
                 j.reliquiaCofreVotadaId = "";
+                RelicEngine.otorgarReliquia(this.state, j, relId, true);
             }
         });
 

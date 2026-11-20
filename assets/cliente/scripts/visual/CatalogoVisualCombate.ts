@@ -27,6 +27,14 @@ export const INFO_VISUAL_ESTADOS: Record<EstadoId, IInfoVisualEstado> = {
         sprite: "fuerza_temporal",
         construirDescripcion: (v) => `Al final de este turno, pierde ${v} de Fuerza.`
     },
+    DESTREZA: {
+        nombre: "Destreza",
+        sprite: "destreza",
+        construirDescripcion: (v) =>
+            v >= 0
+                ? `Las cartas otorgan +${v} de bloqueo adicional.`
+                : `Las cartas otorgan ${v} menos de bloqueo.`
+    },
     VULNERABLE: {
         nombre: "Vulnerable",
         sprite: "vulnerable",

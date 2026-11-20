@@ -9,13 +9,16 @@ import {
     validarRequisitosOpcionParaJugador
 } from "../../../../assets/cliente/compartido/Eventos";
 import {
-    CATALOGO_CARTAS,
     generarOpcionesRecompensa,
+    obtenerDataCarta,
     obtenerMaldicionAleatoria
 } from "../../../../assets/cliente/compartido/Cartas";
 import { obtenerReliquiasRecompensa } from "../../../../assets/cliente/compartido/Reliquias";
 import { CONFIG_MAPA } from "../../../../assets/cliente/compartido/Mapa";
 import { IPayloadAccionEvento } from "../../../../assets/cliente/compartido/GameTypes";
+import { RelicEngine } from "../../engine/RelicEngine";
+import { PlayerStatsHelper } from "../../engine/PlayerStatsHelper";
+import { CombatEngine } from "../../engine/CombatEngine";
 
 export class EventService {
     private timerEvento: Delayed | null = null;
@@ -44,7 +47,8 @@ export class EventService {
                 const pideMaldicion = op.efectos.some((e) => e.tipo === "GANAR_MALDICION");
 
                 reliquiasComunitariasPorOpcion[idx] = pideReliquia
-                    ? obtenerReliquiasRecompensa(this.state.jugadores, 1)[0] || "distintivo_abogado"
+                    ? obtenerReliquiasRecompensa(this.state.jugadores, 1, undefined, "EVENTO")[0] ||
+                      "distintivo_abogado"
                     : "";
                 maldicionesComunitariasPorOpcion[idx] = pideMaldicion
                     ? obtenerMaldicionAleatoria()
@@ -68,7 +72,8 @@ export class EventService {
             const reliquiasPreSorteadas = obtenerReliquiasRecompensa(
                 this.state.jugadores,
                 evento.opciones.length,
-                j.personajeId
+                j.personajeId,
+                "EVENTO"
             );
 
             evento.opciones.forEach((op, idx) => {
@@ -282,10 +287,10 @@ export class EventService {
         for (const ef of opcion.efectos) {
             switch (ef.tipo) {
                 case "GANAR_ORO":
-                    jugador.oro += ef.cantidad;
+                    PlayerStatsHelper.modificarOro(jugador, ef.cantidad);
                     break;
                 case "PERDER_ORO":
-                    jugador.oro = Math.max(0, jugador.oro - ef.cantidad);
+                    PlayerStatsHelper.modificarOro(jugador, -ef.cantidad);
                     break;
                 case "CURAR_HP": {
                     const curacion = ef.porcentajeHpMax
@@ -295,7 +300,9 @@ export class EventService {
                     break;
                 }
                 case "PERDER_HP":
-                    jugador.hp = Math.max(1, jugador.hp - ef.cantidad);
+                    PlayerStatsHelper.aplicarPerdidaHpJugador(this.state, jugador, ef.cantidad, {
+                        permitirMuerte: false
+                    });
                     break;
                 case "GANAR_CARTA": {
                     const cartaId = jugador.eventoOpcionCartas[indiceOpcion];
@@ -304,7 +311,7 @@ export class EventService {
                 }
                 case "GANAR_RELIQUIA": {
                     const relId = jugador.eventoOpcionReliquias[indiceOpcion];
-                    if (relId) jugador.reliquias.push(relId);
+                    if (relId) RelicEngine.otorgarReliquia(this.state, jugador, relId, true);
                     break;
                 }
                 case "GANAR_MALDICION": {
@@ -314,8 +321,10 @@ export class EventService {
                 }
                 case "ELIMINAR_CARTA_AZAR": {
                     if (jugador.mazoMaestro.length > 1) {
-                        const idxAzar = Math.floor(Math.random() * jugador.mazoMaestro.length);
-                        jugador.mazoMaestro.splice(idxAzar, 1);
+                        const mazoTemp = Array.from(jugador.mazoMaestro);
+                        const idxAzar = Math.floor(Math.random() * mazoTemp.length);
+                        mazoTemp.splice(idxAzar, 1);
+                        CombatEngine.sincronizarArraySchema(jugador.mazoMaestro, mazoTemp);
                     }
                     break;
                 }
@@ -326,7 +335,9 @@ export class EventService {
                         indiceCartaElegida >= 0 &&
                         indiceCartaElegida < jugador.mazoMaestro.length
                     ) {
-                        jugador.mazoMaestro.splice(indiceCartaElegida, 1);
+                        const mazoTemp = Array.from(jugador.mazoMaestro);
+                        mazoTemp.splice(indiceCartaElegida, 1);
+                        CombatEngine.sincronizarArraySchema(jugador.mazoMaestro, mazoTemp);
                     }
                     break;
                 }
@@ -335,14 +346,16 @@ export class EventService {
                         const indicesCandidatos: number[] = [];
                         for (let i = 0; i < jugador.mazoMaestro.length; i++) {
                             const id = jugador.mazoMaestro[i];
-                            if (CATALOGO_CARTAS[id]?.calidad === ef.calidad) {
+                            if (obtenerDataCarta(id)?.calidad === ef.calidad) {
                                 indicesCandidatos.push(i);
                             }
                         }
                         if (indicesCandidatos.length > 0) {
+                            const mazoTemp = Array.from(jugador.mazoMaestro);
                             const elegido =
                                 indicesCandidatos[Math.floor(Math.random() * indicesCandidatos.length)];
-                            jugador.mazoMaestro.splice(elegido, 1);
+                            mazoTemp.splice(elegido, 1);
+                            CombatEngine.sincronizarArraySchema(jugador.mazoMaestro, mazoTemp);
                         }
                     }
                     break;

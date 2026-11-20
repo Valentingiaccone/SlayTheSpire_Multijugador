@@ -30,6 +30,7 @@ export const MENSAJES = {
     SALIR_TIENDA: "salir_tienda",
     ACCION_EVENTO: "accion_evento",
     VOTAR_OPCION_EVENTO: "votar_opcion_evento",
+    RESOLVER_ACCION_RELIQUIA: "resolver_accion_reliquia",
     REINICIAR_PARTIDA: "reiniciar_partida",
     SECUENCIA_COMBATE: "secuencia_combate"
 } as const;
@@ -52,6 +53,8 @@ export interface IPayloadAccionEvento {
     indiceOpcion: number;
     indiceCartaEliminar?: number;
 }
+
+export type TipoAccionReliquiaPendiente = "" | "ENCANTAR_CARTA" | "ELIMINAR_CARTAS";
 
 export type PersonajeId = "SHELLY" | "CROW";
 export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow" | "maldicion";
@@ -208,6 +211,10 @@ export interface IJugadorCliente {
     eventoOpcionReliquias: Iterable<string> & { length: number; [index: number]: string };
     eventoOpcionMaldiciones: Iterable<string> & { length: number; [index: number]: string };
     estados: IMapaEstadosCliente;
+    contadoresReliquias: IMapaEstadosCliente;
+    accionReliquiaPendienteTipo: TipoAccionReliquiaPendiente;
+    accionReliquiaPendienteParam: string;
+    accionReliquiaPendienteRestantes: number;
 }
 
 export interface IEnemigoCliente {

@@ -3,7 +3,8 @@ import {
     FaseSala,
     PersonajeId,
     PERSONAJES_INFO,
-    ECONOMIA_CONFIG
+    ECONOMIA_CONFIG,
+    TipoAccionReliquiaPendiente
 } from "../../../../assets/cliente/compartido/GameTypes";
 import { EstadoNodoMapa, TipoNodoMapa } from "../../../../assets/cliente/compartido/Mapa";
 import { AmbientacionId, TipoIntencion } from "../../../../assets/cliente/compartido/Enemigos";
@@ -78,6 +79,11 @@ export class PlayerState extends Schema {
     @type(["string"]) reliquias = new ArraySchema<string>();
     @type({ map: "number" }) estados = new MapSchema<number>();
 
+    @type({ map: "number" }) contadoresReliquias = new MapSchema<number>();
+    @type("string") accionReliquiaPendienteTipo: TipoAccionReliquiaPendiente = "";
+    @type("string") accionReliquiaPendienteParam: string = "";
+    @type("number") accionReliquiaPendienteRestantes: number = 0;
+
     @type("number") cantPilaRobo: number = 0;
     @type("number") cantDescarte: number = 0;
     @type("number") cantAgotadas: number = 0;
@@ -88,6 +94,11 @@ export class PlayerState extends Schema {
     cartasJugadasTurno: number = 0;
     ataquesJugadosTurno: number = 0;
     cartasJugadasCombate: number = 0;
+    colaAccionesReliquiaPendientes: {
+        tipo: TipoAccionReliquiaPendiente;
+        param: string;
+        restantes: number;
+    }[] = [];
 
     public aplicarDatosPersonaje(personajeId: PersonajeId) {
         const info = PERSONAJES_INFO[personajeId];
@@ -132,4 +143,5 @@ export class SpireState extends Schema {
     @type([MapNodeState]) nodosMapa = new ArraySchema<MapNodeState>();
 
     ordenAmbientacionesRun: AmbientacionId[] = ["BRAWL_STARS", "CLASH_ROYALE", "POKEMON"];
+    combateFinalizando: boolean = false;
 }

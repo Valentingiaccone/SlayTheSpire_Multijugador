@@ -1,6 +1,13 @@
 import { resources, SpriteFrame, Sprite, Texture2D } from "cc";
 
-export type TipoCarpeta = "iconos" | "cartas" | "reliquias" | "entidades" | "estados" | "intenciones";
+export type TipoCarpeta =
+    | "iconos"
+    | "cartas"
+    | "reliquias"
+    | "entidades"
+    | "estados"
+    | "intenciones"
+    | "encantamientos";
 
 export class SpriteManager {
     private static cacheSprites: Map<string, SpriteFrame> = new Map();

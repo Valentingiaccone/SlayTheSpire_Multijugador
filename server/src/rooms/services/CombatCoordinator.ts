@@ -12,6 +12,7 @@ export class CombatCoordinator {
     ) {}
 
     public iniciarCombate(tipoCombate: "COMBATE" | "ELITE" | "JEFE" = "COMBATE"): void {
+        this.state.combateFinalizando = false;
         this.state.faseActual = "COMBAT";
         this.state.turnoNumero = 1;
         this.state.esCombateElite = tipoCombate === "ELITE";
@@ -37,6 +38,7 @@ export class CombatCoordinator {
         this.state.jugadores.forEach((j) => {
             if (j.hp > 0) {
                 CombatEngine.prepararMazoCombate(j);
+                RelicEngine.reiniciarContadoresCombate(j);
                 j.energia = j.energiaMax;
                 j.turnoTerminado = false;
             }
@@ -115,6 +117,7 @@ export class CombatCoordinator {
             j.turnoTerminado = false;
             j.cartasJugadasTurno = 0;
             j.ataquesJugadosTurno = 0;
+            RelicEngine.actualizarContadoresInicioTurno(j, this.state.turnoNumero);
 
             CombatEngine.procesarInicioTurno(j, this.state);
             if (j.hp <= 0) return;

@@ -4,9 +4,16 @@ import { CARTAS_LADRON } from "./AlmacenCartas/CartasLadron";
 import { CARTAS_ASESINO } from "./AlmacenCartas/CartasAsesino";
 import { CARTAS_MALDICION } from "./AlmacenCartas/CartasMaldicion";
 import { ClaseId, PersonajeId, PERSONAJES_INFO } from "./GameTypes";
-import { DescriptorEfecto, EstadoId, IEfecto, TipoEfecto, TipoObjetivo } from "./CondicionesYEfectos";
+import {
+    DescriptorEfecto,
+    EncantamientoId,
+    EstadoId,
+    IEfecto,
+    TipoEfecto,
+    TipoObjetivo
+} from "./CondicionesYEfectos";
 
-export type { EstadoId, IEfecto, TipoEfecto, TipoObjetivo, DescriptorEfecto };
+export type { EstadoId, IEfecto, TipoEfecto, TipoObjetivo, DescriptorEfecto, EncantamientoId };
 export type TipoCartaId = "ATAQUE" | "HABILIDAD" | "PODER" | "MALDICION";
 export type CalidadCarta = "BASICA" | "COMUN" | "EPICA" | "LEGENDARIA" | "MALDICION";
 export type ContextoGeneracionCartas = "COMBATE" | "ELITE" | "JEFE" | "TIENDA" | "EVENTO";
@@ -45,6 +52,12 @@ export interface ICartaData {
     esMejorada?: boolean;
     idMejora?: string;
     idBase?: string;
+}
+
+export interface IInstanciaCartaParseada {
+    cartaIdBase: string;
+    encantamiento?: EncantamientoId;
+    gratisEsteTurno: boolean;
 }
 
 const PRECIOS_POR_CALIDAD: Record<CalidadCarta, number> = {
@@ -114,19 +127,92 @@ for (const base of TODAS_LAS_CARTAS_BASE) {
     }
 }
 
-export function puedeMejorarseCarta(cartaId: string): boolean {
-    const data = CATALOGO_CARTAS[cartaId];
+export function parsearCartaInstancia(rawId: string): IInstanciaCartaParseada {
+    if (!rawId) return { cartaIdBase: "", gratisEsteTurno: false };
+    let texto = rawId;
+    let gratisEsteTurno = false;
+
+    if (texto.endsWith("~0")) {
+        gratisEsteTurno = true;
+        texto = texto.slice(0, -2);
+    }
+
+    const idxArroba = texto.indexOf("@");
+    if (idxArroba !== -1) {
+        return {
+            cartaIdBase: texto.slice(0, idxArroba),
+            encantamiento: texto.slice(idxArroba + 1) as EncantamientoId,
+            gratisEsteTurno
+        };
+    }
+
+    return { cartaIdBase: texto, gratisEsteTurno };
+}
+
+export function construirIdInstanciaCarta(
+    cartaIdBase: string,
+    encantamiento?: EncantamientoId,
+    gratisEsteTurno: boolean = false
+): string {
+    let res = cartaIdBase;
+    if (encantamiento) res += `@${encantamiento}`;
+    if (gratisEsteTurno) res += "~0";
+    return res;
+}
+
+export function obtenerDataCarta(rawId: string): ICartaData | undefined {
+    const { cartaIdBase } = parsearCartaInstancia(rawId);
+    return CATALOGO_CARTAS[cartaIdBase];
+}
+
+export function obtenerEncantamientoCarta(rawId: string): EncantamientoId | undefined {
+    return parsearCartaInstancia(rawId).encantamiento;
+}
+
+export function esCartaGratisEsteTurno(rawId: string): boolean {
+    return parsearCartaInstancia(rawId).gratisEsteTurno;
+}
+
+export function limpiarMarcadoresTemporalesCarta(rawId: string): string {
+    const { cartaIdBase, encantamiento } = parsearCartaInstancia(rawId);
+    return construirIdInstanciaCarta(cartaIdBase, encantamiento, false);
+}
+
+export function marcarCartaGratisEsteTurno(rawId: string): string {
+    const { cartaIdBase, encantamiento } = parsearCartaInstancia(rawId);
+    return construirIdInstanciaCarta(cartaIdBase, encantamiento, true);
+}
+
+export function puedeEncantarseCarta(rawId: string): boolean {
+    const parsed = parsearCartaInstancia(rawId);
+    return Boolean(CATALOGO_CARTAS[parsed.cartaIdBase] && !parsed.encantamiento);
+}
+
+export function aplicarEncantamientoCarta(rawId: string, encantamiento: EncantamientoId): string {
+    const parsed = parsearCartaInstancia(rawId);
+    return construirIdInstanciaCarta(parsed.cartaIdBase, encantamiento, parsed.gratisEsteTurno);
+}
+
+export function puedeMejorarseCarta(rawId: string): boolean {
+    const data = obtenerDataCarta(rawId);
     return Boolean(data && !data.esMejorada && data.idMejora && CATALOGO_CARTAS[data.idMejora]);
 }
 
-export function obtenerCartaMejorada(cartaId: string): ICartaData | undefined {
-    const data = CATALOGO_CARTAS[cartaId];
+export function obtenerCartaMejorada(rawId: string): ICartaData | undefined {
+    const data = obtenerDataCarta(rawId);
     if (!data || !data.idMejora) return undefined;
     return CATALOGO_CARTAS[data.idMejora];
 }
 
-export function obtenerPrecioCarta(cartaId: string): number {
-    const data = CATALOGO_CARTAS[cartaId];
+export function obtenerIdCartaMejoradaPreservandoExtras(rawId: string): string | undefined {
+    const parsed = parsearCartaInstancia(rawId);
+    const mejorada = obtenerCartaMejorada(rawId);
+    if (!mejorada) return undefined;
+    return construirIdInstanciaCarta(mejorada.id, parsed.encantamiento, parsed.gratisEsteTurno);
+}
+
+export function obtenerPrecioCarta(rawId: string): number {
+    const data = obtenerDataCarta(rawId);
     if (!data) return 55;
     return data.precioTienda ?? PRECIOS_POR_CALIDAD[data.calidad || "COMUN"];
 }
@@ -140,6 +226,34 @@ export function obtenerMaldicionAleatoria(): string {
     if (CARTAS_MALDICION.length === 0) return "maldicion_herida";
     const idx = Math.floor(Math.random() * CARTAS_MALDICION.length);
     return CARTAS_MALDICION[idx].id;
+}
+
+export function generarCartaPorCalidad(
+    personajeId: PersonajeId,
+    calidad: CalidadCarta,
+    cantidadJugadores: number = 2
+): string | undefined {
+    const infoPersonaje = PERSONAJES_INFO[personajeId];
+    const clasesPermitidas: string[] = infoPersonaje ? [...infoPersonaje.clases] : ["combate"];
+    const esJuegoSolitario = cantidadJugadores <= 1;
+
+    let candidatas = Object.values(CATALOGO_CARTAS).filter(
+        (c) =>
+            c.enPoolRecompensa &&
+            !c.esMejorada &&
+            c.calidad === calidad &&
+            clasesPermitidas.includes(c.clase) &&
+            (!esJuegoSolitario || !c.soloMultijugador)
+    );
+
+    if (candidatas.length === 0) {
+        candidatas = Object.values(CATALOGO_CARTAS).filter(
+            (c) => c.enPoolRecompensa && !c.esMejorada && c.calidad === calidad
+        );
+    }
+
+    if (candidatas.length === 0) return undefined;
+    return candidatas[Math.floor(Math.random() * candidatas.length)].id;
 }
 
 function sortearCalidadPorContexto(contexto: ContextoGeneracionCartas): CalidadCarta {

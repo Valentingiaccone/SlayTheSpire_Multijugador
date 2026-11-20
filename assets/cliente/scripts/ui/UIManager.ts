@@ -89,6 +89,8 @@ export class UIManager extends Component {
     }
 
     private onEstadoActualizado(state: IEstadoSalaCliente) {
+        this.sincronizarAccionReliquiaPendiente(state);
+
         const fase: FaseSala = state.faseActual;
         if (fase === this.ultimaFaseAplicada) return;
 
@@ -110,6 +112,27 @@ export class UIManager extends Component {
         this.aplicarCambioDeFase(fase);
     }
 
+    private sincronizarAccionReliquiaPendiente(state: IEstadoSalaCliente) {
+        if (!this.visorMazo) return;
+        const miId = NetworkManager.instance?.room?.sessionId;
+        const miJugador = miId ? state.jugadores.get(miId) : undefined;
+        if (!miJugador) return;
+
+        const pendiente = miJugador.accionReliquiaPendienteTipo;
+
+        if (pendiente === "ENCANTAR_CARTA") {
+            if (!this.visorMazo.node.active || !this.visorMazo.esModoAccionReliquia()) {
+                this.visorMazo.abrirModoEncantarReliquia();
+            }
+        } else if (pendiente === "ELIMINAR_CARTAS") {
+            if (!this.visorMazo.node.active || !this.visorMazo.esModoAccionReliquia()) {
+                this.visorMazo.abrirModoEliminarMultipleReliquia();
+            }
+        } else if (this.visorMazo.node.active && this.visorMazo.esModoAccionReliquia()) {
+            this.visorMazo.cerrarVisor();
+        }
+    }
+
     private aplicarCambioDeFase(fase: FaseSala) {
         if (this.timerTransicionFase) {
             clearTimeout(this.timerTransicionFase);
@@ -117,7 +140,9 @@ export class UIManager extends Component {
         }
 
         this.mapaAbiertoEnConsulta = false;
-        this.visorMazo?.cerrarVisor();
+        if (this.visorMazo && !this.visorMazo.esModoAccionReliquia()) {
+            this.visorMazo.cerrarVisor();
+        }
         this.ultimaFaseAplicada = fase;
 
         if (this.panelLobby) this.panelLobby.active = fase === "LOBBY";
@@ -172,7 +197,7 @@ export class UIManager extends Component {
     }
 
     public onClickToggleMazoConsulta() {
-        if (!this.visorMazo) return;
+        if (!this.visorMazo || this.visorMazo.esModoAccionReliquia()) return;
         if (this.visorMazo.node.active) {
             this.visorMazo.cerrarVisor();
         } else {

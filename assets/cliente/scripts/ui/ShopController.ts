@@ -1,7 +1,7 @@
 import { _decorator, Component, Node, Label, Button, Sprite, Color, instantiate } from "cc";
 import { NetworkManager, NetworkEvents, EVENTO_ESTADO_ACTUALIZADO } from "../network/NetworkManager";
 import { ECONOMIA_CONFIG, IEstadoSalaCliente, IJugadorCliente } from "../../compartido/GameTypes";
-import { CATALOGO_CARTAS, obtenerPrecioCarta } from "../../compartido/Cartas";
+import { obtenerDataCarta, obtenerPrecioCarta } from "../../compartido/Cartas";
 import { CATALOGO_RELIQUIAS, obtenerPrecioReliquia } from "../../compartido/Reliquias";
 import { SpriteManager } from "../utils/SpriteManager";
 import { CardView } from "./CardView";
@@ -14,18 +14,14 @@ export class ShopController extends Component {
     @property(Label) labelTituloTienda: Label = null!;
     @property(Label) labelMiOro: Label = null!;
 
-    // 1. Sección Cartas en venta
     @property(Node) contenedorCartasTienda: Node = null!;
     @property(Node) templateItemCartaTienda: Node = null!;
 
-    // 2. Sección 3 Reliquias en venta
     @property(Node) contenedorReliquiasTienda: Node = null!;
     @property(Node) templateItemReliquiaTienda: Node = null!;
 
-    // 3. Sección 3 Pociones (espacio provisional preparado)
     @property([Label]) labelsSlotsPociones: Label[] = [];
 
-    // 4. Servicio de Eliminar Carta y Salir
     @property(Button) btnEliminarCarta: Button = null!;
     @property(Label) labelBtnEliminarCarta: Label = null!;
     @property(Button) btnContinuarSalir: Button = null!;
@@ -74,7 +70,9 @@ export class ShopController extends Component {
             if (this.btnContinuarSalir) this.btnContinuarSalir.interactable = false;
             if (this.labelBtnContinuarSalir) this.labelBtnContinuarSalir.string = "Esperando aliados...";
             if (this.btnEliminarCarta) this.btnEliminarCarta.interactable = false;
-            this.visorMazo?.cerrarVisor();
+            if (this.visorMazo && !this.visorMazo.esModoAccionReliquia()) {
+                this.visorMazo.cerrarVisor();
+            }
             return;
         }
 
@@ -114,7 +112,7 @@ export class ShopController extends Component {
             }
 
             const cartaId = cartasIds[i];
-            const data = CATALOGO_CARTAS[cartaId];
+            const data = obtenerDataCarta(cartaId);
             if (!data) {
                 nodo.active = false;
                 return;
@@ -127,7 +125,6 @@ export class ShopController extends Component {
             const cardView = nodo.getComponent(CardView) || nodo.getComponentInChildren(CardView);
             cardView?.configurarModoEstatico(data, 0.9);
 
-            // Si el template tiene un Label extra para el precio, o usamos el tipo/costo
             const labelPrecio = nodo.getChildByName("LabelPrecio")?.getComponent(Label);
             if (labelPrecio) {
                 labelPrecio.string = `💰 ${precio}`;
@@ -180,12 +177,12 @@ export class ShopController extends Component {
 
             const sp = nodo.getComponentInChildren(Sprite);
             if (sp) {
-                SpriteManager.aplicarSprite(sp, "reliquias", data.icono);
+                void SpriteManager.aplicarSprite(sp, "reliquias", data.icono, "generico");
             }
 
             const lbl = nodo.getComponentInChildren(Label);
             if (lbl) {
-                lbl.string = `${data.nombre} (💰 ${precio})\n${data.descripcion}`;
+                lbl.string = `${data.nombre} [${data.calidad}] (💰 ${precio})\n${data.descripcion}`;
                 lbl.color = alcanzaOro ? new Color(255, 255, 255) : new Color(255, 130, 130);
             }
 
@@ -210,7 +207,6 @@ export class ShopController extends Component {
         }
     }
 
-    // Asignar al Click Events del botón de Eliminar Carta en la tienda
     public onClickAbrirEliminarCarta() {
         this.visorMazo?.abrirModoEliminar(
             (indiceMazo) => {
@@ -220,7 +216,6 @@ export class ShopController extends Component {
         );
     }
 
-    // Asignar al Click Events del botón Continuar / Salir de la tienda
     public onClickSalirTienda() {
         NetworkManager.instance?.salirTienda();
     }

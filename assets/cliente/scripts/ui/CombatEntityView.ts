@@ -24,6 +24,7 @@ const { ccclass, property } = _decorator;
 const ORDEN_ESTADOS: EstadoId[] = [
     "FUERZA",
     "FUERZA_TEMPORAL",
+    "DESTREZA",
     "VULNERABLE",
     "DEBIL",
     "ESPINAS",
@@ -42,23 +43,18 @@ export class CombatEntityView extends Component {
     @property(SpriteSheetAnimator) animador: SpriteSheetAnimator = null!;
     @property(Label) labelNombre: Label = null!;
 
-    // Barra visual + texto de HP independientes
     @property(ProgressBar) barraVida: ProgressBar = null!;
     @property(Label) labelVida: Label = null!;
 
-    // Bloqueo independiente (se oculta automáticamente si es 0)
     @property(Node) nodoBloqueo: Node = null!;
     @property(Label) labelBloqueo: Label = null!;
 
-    // Solo para aliados (pueden quedar vacíos en TemplateEnemigo)
     @property(Node) nodoEnergia: Node = null!;
     @property(Label) labelEnergia: Label = null!;
     @property(Label) labelEstadoTurno: Label = null!;
 
-    // Solo para enemigos (puede quedar vacío en TemplateAliado)
     @property(IconoCombateView) vistaIntencion: IconoCombateView = null!;
 
-    // Contenedor con Layout horizontal donde se instancian los íconos de estados
     @property(Node) contenedorEstados: Node = null!;
     @property(Prefab) prefabIconoEstado: Prefab = null!;
 
@@ -204,7 +200,10 @@ export class CombatEntityView extends Component {
                 estadosMiJugador
             );
             valorMostrar = danioReal;
-            textoValor = golpes > 1 && enemigo.intencionTipo === "ATACAR" ? `${danioReal}x${golpes}` : `${danioReal}`;
+            textoValor =
+                golpes > 1 && enemigo.intencionTipo === "ATACAR"
+                    ? `${danioReal}x${golpes}`
+                    : `${danioReal}`;
 
             if (danioReal > enemigo.intencionValor) {
                 colorTexto = new Color(255, 120, 120);
@@ -407,7 +406,10 @@ export class CombatEntityView extends Component {
         return new Promise((resolve) => {
             const nombreEstado = INFO_VISUAL_ESTADOS[estadoId as EstadoId]?.nombre || estadoId;
             const signo = valorAgregado > 0 ? "+" : "";
-            this.mostrarTextoFlotante(`${signo}${valorAgregado} ${nombreEstado}`, new Color(255, 220, 110));
+            this.mostrarTextoFlotante(
+                `${signo}${valorAgregado} ${nombreEstado}`,
+                new Color(255, 220, 110)
+            );
             setTimeout(() => resolve(), 140);
         });
     }

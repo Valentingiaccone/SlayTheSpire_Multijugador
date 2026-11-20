@@ -3,8 +3,13 @@ import {
     generarOpcionesRecompensa,
     ContextoGeneracionCartas
 } from "../../../../assets/cliente/compartido/Cartas";
-import { obtenerReliquiasRecompensa } from "../../../../assets/cliente/compartido/Reliquias";
+import {
+    ContextoGeneracionReliquias,
+    obtenerReliquiasRecompensa
+} from "../../../../assets/cliente/compartido/Reliquias";
 import { ECONOMIA_CONFIG } from "../../../../assets/cliente/compartido/GameTypes";
+import { RelicEngine } from "../../engine/RelicEngine";
+import { PlayerStatsHelper } from "../../engine/PlayerStatsHelper";
 
 export class RewardService {
     constructor(
@@ -13,11 +18,15 @@ export class RewardService {
     ) {}
 
     public prepararRecompensas(): void {
-        const contexto: ContextoGeneracionCartas = this.state.esCombateJefe
+        const contextoCartas: ContextoGeneracionCartas = this.state.esCombateJefe
             ? "JEFE"
             : this.state.esCombateElite
             ? "ELITE"
             : "COMBATE";
+
+        const contextoReliquia: ContextoGeneracionReliquias = this.state.esCombateJefe
+            ? "JEFE"
+            : "ELITE";
 
         const oroBase = this.state.esCombateJefe
             ? ECONOMIA_CONFIG.ORO_COMBATE_JEFE
@@ -36,16 +45,22 @@ export class RewardService {
             jugador.reliquiaRecompensa = "";
             jugador.oroRecompensa = oroBase;
 
+            const cantOpciones = 3 + RelicEngine.obtenerCartasExtraRecompensa(jugador);
             const opciones = generarOpcionesRecompensa(
                 jugador.personajeId,
-                3,
-                contexto,
+                cantOpciones,
+                contextoCartas,
                 cantJugadores
             );
             opciones.forEach((id) => jugador.opcionesRecompensa.push(id));
 
             if (this.state.esCombateElite || this.state.esCombateJefe) {
-                const reliquias = obtenerReliquiasRecompensa(this.state.jugadores, 1, jugador.personajeId);
+                const reliquias = obtenerReliquiasRecompensa(
+                    this.state.jugadores,
+                    1,
+                    jugador.personajeId,
+                    contextoReliquia
+                );
                 jugador.reliquiaRecompensa = reliquias[0] || "";
             }
         });
@@ -61,22 +76,26 @@ export class RewardService {
         const jugador = this.state.jugadores.get(sessionId);
         if (!jugador || jugador.recompensaElegida) return;
 
+        const reliquiaDisponible = jugador.reliquiaRecompensa;
+        const oroDisponible = jugador.oroRecompensa;
+
         if (cartaId && jugador.opcionesRecompensa.includes(cartaId)) {
             jugador.mazoMaestro.push(cartaId);
-        }
-
-        if (tomarReliquia && jugador.reliquiaRecompensa) {
-            jugador.reliquias.push(jugador.reliquiaRecompensa);
-        }
-
-        if (tomarOro && jugador.oroRecompensa > 0) {
-            jugador.oro += jugador.oroRecompensa;
         }
 
         jugador.recompensaElegida = true;
         jugador.opcionesRecompensa.clear();
         jugador.reliquiaRecompensa = "";
         jugador.oroRecompensa = 0;
+
+        if (tomarOro && oroDisponible > 0) {
+            PlayerStatsHelper.modificarOro(jugador, oroDisponible);
+        }
+
+        if (tomarReliquia && reliquiaDisponible) {
+            RelicEngine.otorgarReliquia(this.state, jugador, reliquiaDisponible, true);
+        }
+
         this.verificarFinRecompensas();
     }
 

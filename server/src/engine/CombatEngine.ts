@@ -1,7 +1,11 @@
 import { SpireState, PlayerState, EnemyState } from "../rooms/schema/SpireState";
 import {
-    CATALOGO_CARTAS,
-    obtenerCartaMejorada,
+    esCartaGratisEsteTurno,
+    limpiarMarcadoresTemporalesCarta,
+    marcarCartaGratisEsteTurno,
+    obtenerDataCarta,
+    obtenerEncantamientoCarta,
+    obtenerIdCartaMejoradaPreservandoExtras,
     puedeMejorarseCarta
 } from "../../../assets/cliente/compartido/Cartas";
 import {
@@ -55,8 +59,14 @@ export class CombatEngine {
             RelicEngine.dispararParaJugador("AL_TERMINAR_TURNO", state, jugador, {}, cola);
         });
 
-        bus.suscribir("AL_JUGAR_CARTA", ({ state, cola, jugador, objetivoId }) => {
-            RelicEngine.dispararParaJugador("AL_JUGAR_CARTA", state, jugador, { objetivoId }, cola);
+        bus.suscribir("AL_JUGAR_CARTA", ({ state, cola, jugador, carta, objetivoId }) => {
+            RelicEngine.dispararParaJugador(
+                "AL_JUGAR_CARTA",
+                state,
+                jugador,
+                { cartaJugada: carta, objetivoId },
+                cola
+            );
         });
 
         bus.suscribir("AL_INFLIGIR_DANIO", ({ state, cola, atacante, defensor, danioInfligido }) => {
@@ -83,12 +93,11 @@ export class CombatEngine {
             );
         });
 
-        bus.suscribir("AL_MORIR_ENTIDAD", ({ state, cola, entidadMuerta, autorMuerte }) => {
-            if (entidadMuerta instanceof EnemyState && autorMuerte instanceof PlayerState) {
-                RelicEngine.dispararParaJugador(
+        bus.suscribir("AL_MORIR_ENTIDAD", ({ state, cola, entidadMuerta }) => {
+            if (entidadMuerta instanceof EnemyState) {
+                RelicEngine.dispararParaTodos(
                     "AL_MORIR_ENEMIGO",
                     state,
-                    autorMuerte,
                     { objetivoId: entidadMuerta.uid },
                     cola
                 );
@@ -190,7 +199,7 @@ export class CombatEngine {
     public static contarAtaquesEnMano(jugador: PlayerState): number {
         let cant = 0;
         for (let i = 0; i < jugador.mano.length; i++) {
-            const c = CATALOGO_CARTAS[jugador.mano[i]];
+            const c = obtenerDataCarta(jugador.mano[i]);
             if (c?.tipo === "ATAQUE") cant++;
         }
         return cant;
@@ -198,7 +207,7 @@ export class CombatEngine {
 
     public static manoTieneSoloAtaques(jugador: PlayerState): boolean {
         for (let i = 0; i < jugador.mano.length; i++) {
-            const c = CATALOGO_CARTAS[jugador.mano[i]];
+            const c = obtenerDataCarta(jugador.mano[i]);
             if (!c || c.tipo !== "ATAQUE") return false;
         }
         return jugador.mano.length > 0;
@@ -306,21 +315,40 @@ export class CombatEngine {
                     break;
                 }
                 case "BLOQUEO": {
-                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    const aplicaDestreza = fuentePorDefecto === "ATAQUE_CARTA" ? lanzador : undefined;
+                    const objetivos = this.resolverObjetivos(
+                        state,
+                        lanzador,
+                        efecto.objetivo,
+                        objetivoId,
+                        atacanteContexto
+                    );
                     for (const obj of objetivos) {
-                        cola.encolarAlFinal(new AccionGanarBloqueo(obj, efecto.valor));
+                        cola.encolarAlFinal(new AccionGanarBloqueo(obj, efecto.valor, aplicaDestreza));
                     }
                     break;
                 }
                 case "APLICAR_ESTADO": {
-                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    const objetivos = this.resolverObjetivos(
+                        state,
+                        lanzador,
+                        efecto.objetivo,
+                        objetivoId,
+                        atacanteContexto
+                    );
                     for (const obj of objetivos) {
                         cola.encolarAlFinal(new AccionAplicarEstado(obj, efecto.estadoId, efecto.valor));
                     }
                     break;
                 }
                 case "ROBAR_CARTA": {
-                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    const objetivos = this.resolverObjetivos(
+                        state,
+                        lanzador,
+                        efecto.objetivo,
+                        objetivoId,
+                        atacanteContexto
+                    );
                     for (const obj of objetivos) {
                         if (obj instanceof PlayerState) {
                             cola.encolarAlFinal(
@@ -336,7 +364,13 @@ export class CombatEngine {
                     break;
                 }
                 case "GANAR_ENERGIA": {
-                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    const objetivos = this.resolverObjetivos(
+                        state,
+                        lanzador,
+                        efecto.objetivo,
+                        objetivoId,
+                        atacanteContexto
+                    );
                     for (const obj of objetivos) {
                         if (obj instanceof PlayerState) {
                             cola.encolarAlFinal(new AccionGanarEnergia(obj, efecto.valor));
@@ -345,14 +379,26 @@ export class CombatEngine {
                     break;
                 }
                 case "CURAR_HP": {
-                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    const objetivos = this.resolverObjetivos(
+                        state,
+                        lanzador,
+                        efecto.objetivo,
+                        objetivoId,
+                        atacanteContexto
+                    );
                     for (const obj of objetivos) {
                         cola.encolarAlFinal(new AccionCurarHp(obj, efecto.valor));
                     }
                     break;
                 }
                 case "PERDER_HP": {
-                    const objetivos = this.resolverObjetivos(state, lanzador, efecto.objetivo, objetivoId, atacanteContexto);
+                    const objetivos = this.resolverObjetivos(
+                        state,
+                        lanzador,
+                        efecto.objetivo,
+                        objetivoId,
+                        atacanteContexto
+                    );
                     for (const obj of objetivos) {
                         cola.encolarAlFinal(new AccionPerderHp(obj, efecto.valor, lanzador));
                     }
@@ -419,6 +465,60 @@ export class CombatEngine {
                                     new AccionAplicarEstado(lanzador, "FUERZA", fuerzaTotal)
                                 );
                             }
+                        }
+                    });
+                    break;
+                }
+                case "BLOQUEO_POR_ORO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            if (efecto.cadaCuantoOro <= 0) return;
+                            const tramos = Math.floor(lanzador.oro / efecto.cadaCuantoOro);
+                            const blq = tramos * efecto.bloqueoPorTramo;
+                            if (blq > 0) {
+                                q.encolarAlInicio(new AccionGanarBloqueo(lanzador, blq));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "BLOQUEO_POR_CARTAS_MAZO": {
+                    cola.encolarAlFinal({
+                        ejecutar: (_st, q) => {
+                            if (efecto.cadaCuantasCartas <= 0) return;
+                            const tramos = Math.floor(lanzador.mazoMaestro.length / efecto.cadaCuantasCartas);
+                            const blq = tramos * efecto.bloqueoPorTramo;
+                            if (blq > 0) {
+                                q.encolarAlInicio(new AccionGanarBloqueo(lanzador, blq));
+                            }
+                        }
+                    });
+                    break;
+                }
+                case "HACER_CARTA_MANO_GRATIS_TURNO": {
+                    cola.encolarAlFinal({
+                        ejecutar: () => {
+                            const manoTemp = [...lanzador.mano];
+                            const elegibles: number[] = [];
+                            for (let i = 0; i < manoTemp.length; i++) {
+                                const cData = obtenerDataCarta(manoTemp[i]);
+                                if (!cData || cData.injugable) continue;
+                                const costoActual = CalculadoraCombate.calcularCostoCarta(
+                                    cData.costo,
+                                    cData.reduccionCostoPorHpPerdido,
+                                    lanzador.hpPerdidoCombate,
+                                    obtenerEncantamientoCarta(manoTemp[i]),
+                                    esCartaGratisEsteTurno(manoTemp[i])
+                                );
+                                if (costoActual > 0) elegibles.push(i);
+                            }
+                            this.mezclarIndices(elegibles);
+                            const limite = Math.min(efecto.cantidad, elegibles.length);
+                            for (let k = 0; k < limite; k++) {
+                                const idx = elegibles[k];
+                                manoTemp[idx] = marcarCartaGratisEsteTurno(manoTemp[idx]);
+                            }
+                            this.sincronizarArraySchema(lanzador.mano, manoTemp);
                         }
                     });
                     break;
@@ -500,16 +600,16 @@ export class CombatEngine {
                             const manoTemp = [...lanzador.mano];
                             if (efecto.cantidad === "TODAS") {
                                 for (const idx of indicesMejorables) {
-                                    const mejorada = obtenerCartaMejorada(manoTemp[idx]);
-                                    if (mejorada) manoTemp[idx] = mejorada.id;
+                                    const mejoradaId = obtenerIdCartaMejoradaPreservandoExtras(manoTemp[idx]);
+                                    if (mejoradaId) manoTemp[idx] = mejoradaId;
                                 }
                             } else {
                                 this.mezclarIndices(indicesMejorables);
                                 const limite = Math.min(efecto.cantidad, indicesMejorables.length);
                                 for (let i = 0; i < limite; i++) {
                                     const idx = indicesMejorables[i];
-                                    const mejorada = obtenerCartaMejorada(manoTemp[idx]);
-                                    if (mejorada) manoTemp[idx] = mejorada.id;
+                                    const mejoradaId = obtenerIdCartaMejoradaPreservandoExtras(manoTemp[idx]);
+                                    if (mejoradaId) manoTemp[idx] = mejoradaId;
                                 }
                             }
                             this.sincronizarArraySchema(lanzador.mano, manoTemp);
@@ -526,7 +626,7 @@ export class CombatEngine {
                                 const idxAzar = Math.floor(Math.random() * manoTemp.length);
                                 const agotada = manoTemp.splice(idxAzar, 1)[0];
                                 if (agotada) {
-                                    lanzador.agotadasInterno.push(agotada);
+                                    lanzador.agotadasInterno.push(limpiarMarcadoresTemporalesCarta(agotada));
                                 }
                             }
                             this.sincronizarArraySchema(lanzador.mano, manoTemp);
@@ -586,7 +686,7 @@ export class CombatEngine {
         if (indiceMano < 0 || indiceMano >= jugador.mano.length) return false;
 
         const cartaId = jugador.mano[indiceMano];
-        const cartaData = CATALOGO_CARTAS[cartaId];
+        const cartaData = obtenerDataCarta(cartaId);
         if (!cartaData || cartaData.injugable) return false;
 
         if (cartaData.requiereManoSoloAtaques && !this.manoTieneSoloAtaques(jugador)) {
@@ -596,7 +696,9 @@ export class CombatEngine {
         const costoRealEnergia = CalculadoraCombate.calcularCostoCarta(
             cartaData.costo,
             cartaData.reduccionCostoPorHpPerdido,
-            jugador.hpPerdidoCombate
+            jugador.hpPerdidoCombate,
+            obtenerEncantamientoCarta(cartaId),
+            esCartaGratisEsteTurno(cartaId)
         );
 
         if (jugador.energia < costoRealEnergia) return false;
@@ -633,7 +735,15 @@ export class CombatEngine {
             objetivoId
         });
 
-        this.encolarEfectos(state, this.colaActiva, jugador, cartaData.efectos, objetivoId, undefined, "ATAQUE_CARTA");
+        this.encolarEfectos(
+            state,
+            this.colaActiva,
+            jugador,
+            cartaData.efectos,
+            objetivoId,
+            undefined,
+            "ATAQUE_CARTA"
+        );
 
         this.busEventos.emitir("AL_JUGAR_CARTA", {
             state,
@@ -643,12 +753,13 @@ export class CombatEngine {
             objetivoId
         });
 
+        const cartaLimpia = limpiarMarcadoresTemporalesCarta(cartaId);
         if (cartaData.tipo === "PODER") {
             // Los poderes se consumen al jugarse
         } else if (cartaData.agotar || cartaData.eterea) {
-            jugador.agotadasInterno.push(cartaId);
+            jugador.agotadasInterno.push(cartaLimpia);
         } else {
-            jugador.descarteInterno.push(cartaId);
+            jugador.descarteInterno.push(cartaLimpia);
         }
 
         this.actualizarContadoresMazo(jugador);
@@ -698,7 +809,7 @@ export class CombatEngine {
         if (state && jugador.hp > 0) {
             for (let i = 0; i < jugador.mano.length; i++) {
                 const cartaId = jugador.mano[i];
-                const data = CATALOGO_CARTAS[cartaId];
+                const data = obtenerDataCarta(cartaId);
                 if (data?.efectosFinTurnoEnMano && data.efectosFinTurnoEnMano.length > 0) {
                     this.encolarEfectos(
                         state,
@@ -749,13 +860,14 @@ export class CombatEngine {
 
         for (const carta of cartasActuales) {
             if (!carta) continue;
-            const data = CATALOGO_CARTAS[carta];
+            const data = obtenerDataCarta(carta);
+            const cartaLimpia = limpiarMarcadoresTemporalesCarta(carta);
             if (data?.eterea) {
-                jugador.agotadasInterno.push(carta);
+                jugador.agotadasInterno.push(cartaLimpia);
             } else if (data?.eterno) {
-                retenidasEnMano.push(carta);
+                retenidasEnMano.push(cartaLimpia);
             } else {
-                jugador.descarteInterno.push(carta);
+                jugador.descarteInterno.push(cartaLimpia);
             }
         }
 
@@ -764,7 +876,6 @@ export class CombatEngine {
     }
 
     public static reducirEstadosPorTurno(entidad: EntidadCombate): void {
-        // En jugadores, VULNERABLE se reduce al final del ataque enemigo para que dure la fase de ataque enemiga
         const estadosAReducir: EstadoId[] =
             entidad instanceof PlayerState ? ["DEBIL"] : ["VULNERABLE", "DEBIL"];
 
@@ -812,7 +923,6 @@ export class CombatEngine {
     }
 
     public static ejecutarTurnoEnemigos(state: SpireState): void {
-        // Guardamos qué jugadores ya estaban vulnerables antes de que los enemigos actúen
         const jugadoresConVulnerablePrevio = new Set<string>();
         state.jugadores.forEach((j) => {
             if (j.hp > 0 && (j.estados.get("VULNERABLE") || 0) > 0) {
@@ -820,7 +930,6 @@ export class CombatEngine {
             }
         });
 
-        // Los enemigos invocados durante este turno actuarán recién en el turno siguiente
         const enemigosActuantes: EnemyState[] = [];
         state.enemigos.forEach((e) => {
             if (e.hp > 0) enemigosActuantes.push(e);
@@ -972,7 +1081,6 @@ export class CombatEngine {
             }
         }
 
-        // Reducir VULNERABLE en los jugadores que ya lo tenían antes de esta fase enemiga
         state.jugadores.forEach((j) => {
             if (j.hp > 0 && jugadoresConVulnerablePrevio.has(j.sessionId)) {
                 const val = j.estados.get("VULNERABLE") || 0;

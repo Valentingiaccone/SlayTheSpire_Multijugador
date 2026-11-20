@@ -1,4 +1,15 @@
-import { _decorator, Component, Node, Label, Sprite, Button, UITransform, Vec3, tween } from "cc";
+import {
+    _decorator,
+    Component,
+    Node,
+    Label,
+    Sprite,
+    Button,
+    UITransform,
+    Vec3,
+    tween,
+    Color
+} from "cc";
 import {
     NetworkManager,
     NetworkEvents,
@@ -22,15 +33,16 @@ export class RelicTopBarController extends Component {
     @property(Label) labelDescripcionDetalle: Label = null!;
 
     private nodosIconos: Node[] = [];
+    private labelsContadores: Label[] = [];
     private reliquiasActuales: string[] = [];
-    private ultimaFirmaReliquias: string = "";
+    private ultimaFirma: string = "";
 
     onLoad() {
         if (this.panelDetalle) this.panelDetalle.active = false;
     }
 
     onEnable() {
-        this.ultimaFirmaReliquias = "";
+        this.ultimaFirma = "";
         NetworkEvents.on(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
         NetworkEvents.on(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaCombate, this);
         if (NetworkManager.instance?.room?.state) {
@@ -55,10 +67,18 @@ export class RelicTopBarController extends Component {
         if (!this.contenedorIconos) return;
 
         const misReliquias: string[] = Array.from(miJugador.reliquias || []);
-        const firma = misReliquias.join(",");
+        const leerContador = (id: string): number | undefined => {
+            const mapa = miJugador.contadoresReliquias;
+            if (!mapa) return undefined;
+            return typeof mapa.get === "function"
+                ? mapa.get(id)
+                : (mapa as unknown as Record<string, number>)[id];
+        };
 
-        if (firma === this.ultimaFirmaReliquias) return;
-        this.ultimaFirmaReliquias = firma;
+        const firmaContadores = misReliquias.map((r) => `${r}:${leerContador(r) ?? ""}`).join("|");
+        const firma = `${state.faseActual}|${firmaContadores}`;
+        if (firma === this.ultimaFirma) return;
+        this.ultimaFirma = firma;
         this.reliquiasActuales = misReliquias;
 
         while (this.nodosIconos.length < misReliquias.length) {
@@ -69,6 +89,14 @@ export class RelicTopBarController extends Component {
 
             const sp = iconoNode.addComponent(Sprite);
             sp.sizeMode = Sprite.SizeMode.CUSTOM;
+
+            const nodoContador = new Node("LabelContador");
+            nodoContador.setPosition(18, -18, 0);
+            const lblCont = nodoContador.addComponent(Label);
+            lblCont.fontSize = 20;
+            lblCont.lineHeight = 22;
+            lblCont.color = new Color(255, 240, 120);
+            iconoNode.addChild(nodoContador);
 
             iconoNode.addComponent(Button);
             iconoNode.on(
@@ -83,7 +111,10 @@ export class RelicTopBarController extends Component {
 
             this.contenedorIconos.addChild(iconoNode);
             this.nodosIconos.push(iconoNode);
+            this.labelsContadores.push(lblCont);
         }
+
+        const enCombate = state.faseActual === "COMBAT";
 
         this.nodosIconos.forEach((nodo, i) => {
             if (i >= misReliquias.length) {
@@ -101,7 +132,23 @@ export class RelicTopBarController extends Component {
             nodo.active = true;
             const sp = nodo.getComponent(Sprite);
             if (sp) {
-                SpriteManager.aplicarSprite(sp, "reliquias", data.icono);
+                void SpriteManager.aplicarSprite(sp, "reliquias", data.icono, "generico");
+            }
+
+            const lblCont = this.labelsContadores[i];
+            const cfg = data.contadorConfig;
+            const valor = leerContador(reliquiaId);
+
+            if (!cfg) {
+                lblCont.node.active = false;
+            } else if (cfg.modo === "CARGAS") {
+                const v = valor ?? 0;
+                lblCont.node.active = v > 0;
+                lblCont.string = `${v}`;
+            } else {
+                const mostrar = enCombate && valor !== undefined && (cfg.modo === "ACUMULAR_CARTAS" || valor > 0);
+                lblCont.node.active = mostrar;
+                lblCont.string = `${valor ?? 0}`;
             }
         });
     }
@@ -132,10 +179,10 @@ export class RelicTopBarController extends Component {
         if (!this.panelDetalle) return;
         this.panelDetalle.active = true;
 
-        if (this.labelNombreDetalle) this.labelNombreDetalle.string = data.nombre;
+        if (this.labelNombreDetalle) this.labelNombreDetalle.string = `${data.nombre} [${data.calidad}]`;
         if (this.labelDescripcionDetalle) this.labelDescripcionDetalle.string = data.descripcion;
         if (this.spriteDetalle) {
-            SpriteManager.aplicarSprite(this.spriteDetalle, "reliquias", data.icono);
+            void SpriteManager.aplicarSprite(this.spriteDetalle, "reliquias", data.icono, "generico");
         }
     }
 

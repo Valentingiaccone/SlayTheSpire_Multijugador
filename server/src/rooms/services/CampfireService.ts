@@ -1,6 +1,7 @@
 import { SpireState } from "../schema/SpireState";
 import { ECONOMIA_CONFIG, TipoAccionFogata } from "../../../../assets/cliente/compartido/GameTypes";
-import { obtenerCartaMejorada } from "../../../../assets/cliente/compartido/Cartas";
+import { obtenerIdCartaMejoradaPreservandoExtras } from "../../../../assets/cliente/compartido/Cartas";
+import { RelicEngine } from "../../engine/RelicEngine";
 
 export class CampfireService {
     constructor(
@@ -12,6 +13,7 @@ export class CampfireService {
         this.state.jugadores.forEach((j) => {
             j.fogataCompletada = false;
         });
+        RelicEngine.dispararAlIngresarFogata(this.state);
         this.state.faseActual = "CAMPFIRE";
     }
 
@@ -22,7 +24,10 @@ export class CampfireService {
 
         switch (accion.tipo) {
             case "CURAR_PROPIO": {
-                const curacion = Math.max(1, Math.floor(jugador.hpMax * ECONOMIA_CONFIG.PORCENTAJE_CURACION_FOGATA));
+                const curacion = Math.max(
+                    1,
+                    Math.floor(jugador.hpMax * ECONOMIA_CONFIG.PORCENTAJE_CURACION_FOGATA)
+                );
                 jugador.hp = Math.min(jugador.hpMax, jugador.hp + curacion);
                 jugador.fogataCompletada = true;
                 break;
@@ -49,10 +54,10 @@ export class CampfireService {
                 if (typeof idx !== "number" || idx < 0 || idx >= jugador.mazoMaestro.length) return;
 
                 const cartaActualId = jugador.mazoMaestro[idx];
-                const cartaMejorada = obtenerCartaMejorada(cartaActualId);
-                if (!cartaMejorada) return;
+                const cartaMejoradaId = obtenerIdCartaMejoradaPreservandoExtras(cartaActualId);
+                if (!cartaMejoradaId) return;
 
-                jugador.mazoMaestro[idx] = cartaMejorada.id;
+                jugador.mazoMaestro[idx] = cartaMejoradaId;
                 jugador.fogataCompletada = true;
                 break;
             }

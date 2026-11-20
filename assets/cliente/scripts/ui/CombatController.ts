@@ -12,13 +12,17 @@ import {
     IMapaEstadosCliente,
     EventoVisualCombate
 } from "../../compartido/GameTypes";
-import { CATALOGO_CARTAS } from "../../compartido/Cartas";
+import {
+    esCartaGratisEsteTurno,
+    obtenerDataCarta,
+    obtenerEncantamientoCarta
+} from "../../compartido/Cartas";
 import { CalculadoraCombate } from "../../compartido/CalculadoraCombate";
+import { NOMBRES_AMBIENTACION } from "../../compartido/Enemigos";
 import { CardView } from "./CardView";
 import { CombatEntityView } from "./CombatEntityView";
 import { CombatSequencer } from "./CombatSequencer";
 import { DeckViewerController } from "./DeckViewerController";
-import { NOMBRES_AMBIENTACION } from "../../compartido/Enemigos";
 import { TooltipPopupView } from "./TooltipPopupView";
 
 const { ccclass, property } = _decorator;
@@ -49,7 +53,6 @@ export class CombatController extends Component {
     @property(Label) labelCantAgotadas: Label = null!;
 
     @property(DeckViewerController) visorMazo: DeckViewerController = null!;
-
     @property(TooltipPopupView) tooltipCombate: TooltipPopupView = null!;
 
     private vistasEnemigos: Map<string, CombatEntityView> = new Map();
@@ -83,7 +86,7 @@ export class CombatController extends Component {
         NetworkEvents.off(EVENTO_ESTADO_ACTUALIZADO, this.onEstadoCambiado, this);
         NetworkEvents.off(EVENTO_SECUENCIA_COMBATE, this.onSecuenciaRecibida, this);
         this.secuenciador?.limpiar();
-        this.tooltipCombate?.ocultar()
+        this.tooltipCombate?.ocultar();
     }
 
     private onSecuenciaRecibida(eventos: EventoVisualCombate[]) {
@@ -93,11 +96,13 @@ export class CombatController extends Component {
     private onEstadoCambiado(state: IEstadoSalaCliente) {
         if (state.faseActual !== "COMBAT" && state.faseActual !== "DEFEAT") return;
 
-        const mundoTxt = NOMBRES_AMBIENTACION[state.ambientacionActual] || "";
-        this.labelTurno.string =
-            state.faseActual === "DEFEAT"
-                ? "¡DERROTA! Todos cayeron"
-                : `Mapa ${state.mapaActual || 1}/3 (${mundoTxt})  —  Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
+        if (this.labelTurno) {
+            const mundoTxt = NOMBRES_AMBIENTACION[state.ambientacionActual] || "";
+            this.labelTurno.string =
+                state.faseActual === "DEFEAT"
+                    ? "¡DERROTA! Todos cayeron"
+                    : `Mapa ${state.mapaActual || 1}/3 (${mundoTxt})  —  Piso ${state.pisoActual}  —  Turno ${state.turnoNumero}`;
+        }
 
         const miId = NetworkManager.instance?.room?.sessionId;
         const miJugador = miId ? state.jugadores.get(miId) : undefined;
@@ -227,7 +232,7 @@ export class CombatController extends Component {
         let totalAtaquesEnMano = 0;
         let todasSonAtaque = miJugador.mano.length > 0;
         for (let i = 0; i < miJugador.mano.length; i++) {
-            const c = CATALOGO_CARTAS[miJugador.mano[i]];
+            const c = obtenerDataCarta(miJugador.mano[i]);
             if (c?.tipo === "ATAQUE") {
                 totalAtaquesEnMano++;
             } else {
@@ -241,8 +246,8 @@ export class CombatController extends Component {
                 return;
             }
 
-            const cartaId: string = miJugador.mano[i];
-            const data = CATALOGO_CARTAS[cartaId];
+            const rawCartaId: string = miJugador.mano[i];
+            const data = obtenerDataCarta(rawCartaId);
             if (!data) {
                 nodo.active = false;
                 return;
@@ -250,11 +255,15 @@ export class CombatController extends Component {
 
             nodo.active = true;
             const cardView = nodo.getComponent(CardView);
+            const encantamiento = obtenerEncantamientoCarta(rawCartaId);
+            const gratisEsteTurno = esCartaGratisEsteTurno(rawCartaId);
 
             const costoReal = CalculadoraCombate.calcularCostoCarta(
                 data.costo,
                 data.reduccionCostoPorHpPerdido,
-                miJugador.hpPerdidoCombate || 0
+                miJugador.hpPerdidoCombate || 0,
+                encantamiento,
+                gratisEsteTurno
             );
 
             const alcanzaEnergia = miJugador.energia >= costoReal;
@@ -272,7 +281,6 @@ export class CombatController extends Component {
                 cumpleObjetivoAliado &&
                 cumpleRequisitoClash;
 
-            // Cuando se juega un ataque (ej. Golpe perfecto), ya salió de la mano, así que cuenta los demás ataques
             const otrosAtaquesEnMano =
                 data.tipo === "ATAQUE"
                     ? Math.max(0, totalAtaquesEnMano - 1)
@@ -291,7 +299,9 @@ export class CombatController extends Component {
                     bloqueoLanzador: miJugador.bloqueo,
                     ataquesEnMano: otrosAtaquesEnMano,
                     hpPerdidoCombate: miJugador.hpPerdidoCombate || 0
-                }
+                },
+                encantamiento,
+                gratisEsteTurno
             );
         });
     }
