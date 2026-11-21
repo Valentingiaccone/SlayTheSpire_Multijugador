@@ -54,8 +54,8 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": 20,
-      "y": 52.165,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     "_lrot": {
@@ -104,8 +104,8 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -4.859,
-      "y": 2.859,
+      "x": 0,
+      "y": 0,
       "z": 0
     },
     "_lrot": {
@@ -145,7 +145,7 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 150,
+      "width": 140,
       "height": 210
     },
     "_anchorPoint": {
@@ -182,7 +182,7 @@
       "a": 255
     },
     "_spriteFrame": {
-      "__uuid__": "bd00e7ee-fae8-4f9e-bd60-fb38850099cc@f9941",
+      "__uuid__": "8df3d076-d08a-4e10-bbe6-2b7977940ab3@f9941",
       "__expectedType__": "cc.SpriteFrame"
     },
     "_type": 0,
@@ -240,8 +240,8 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -64.417,
-      "y": 92.514,
+      "x": 0,
+      "y": 86,
       "z": 0
     },
     "_lrot": {
@@ -399,8 +399,8 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": 1.019,
-      "y": 82.055,
+      "x": 0,
+      "y": 59.424,
       "z": 0
     },
     "_lrot": {
@@ -482,7 +482,7 @@
     "_actualFontSize": 21,
     "_fontSize": 20,
     "_fontFamily": "Arial",
-    "_lineHeight": 20,
+    "_lineHeight": 15,
     "_overflow": 2,
     "_enableWrapText": true,
     "_font": null,
@@ -599,8 +599,8 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 153.37890625,
-      "height": 50.4
+      "width": 115,
+      "height": 70
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
@@ -641,7 +641,7 @@
     "_actualFontSize": 18,
     "_fontSize": 17,
     "_fontFamily": "Arial",
-    "_lineHeight": 25,
+    "_lineHeight": 16,
     "_overflow": 2,
     "_enableWrapText": true,
     "_font": null,
@@ -876,8 +876,8 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": 27.317,
-      "y": 112.926,
+      "x": 48.132,
+      "y": 88.238,
       "z": 0
     },
     "_lrot": {
@@ -1035,8 +1035,8 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -59.414,
-      "y": 50.637,
+      "x": -60,
+      "y": 25,
       "z": 0
     },
     "_lrot": {
