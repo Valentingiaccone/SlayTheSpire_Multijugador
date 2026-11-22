@@ -7,23 +7,16 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const http_1 = require("http");
 const colyseus_1 = require("colyseus");
-const ws_transport_1 = require("@colyseus/ws-transport");
 const SpireRoom_1 = require("./rooms/SpireRoom");
 const app = (0, express_1.default)();
-app.use((0, cors_1.default)({
-    origin: true,
-    credentials: true
-}));
+app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.use(express_1.default.json());
 const httpServer = (0, http_1.createServer)(app);
 const gameServer = new colyseus_1.Server({
-    transport: new ws_transport_1.WebSocketTransport({ server: httpServer })
+    server: httpServer,
 });
 gameServer.define("spire_room", SpireRoom_1.SpireRoom);
 const PORT = Number(process.env.PORT) || 2567;
 gameServer.listen(PORT).then(() => {
     console.log(`Servidor Colyseus escuchando en el puerto ${PORT}`);
-});
-gameServer.listen(PORT).then(() => {
-    console.log(`Servidor Colyseus escuchando en ws://localhost:${PORT}`);
 });

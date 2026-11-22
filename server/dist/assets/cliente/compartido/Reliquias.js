@@ -1,188 +1,64 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CATALOGO_RELIQUIAS = void 0;
+exports.CATALOGO_RELIQUIAS = exports.PROBABILIDADES_RELIQUIA = exports.PRECIOS_RELIQUIA_POR_CALIDAD = void 0;
 exports.obtenerPrecioReliquia = obtenerPrecioReliquia;
 exports.obtenerReliquiasRecompensa = obtenerReliquiasRecompensa;
 const GameTypes_1 = require("./GameTypes");
-exports.CATALOGO_RELIQUIAS = {
-    bandita: {
-        id: "bandita",
-        nombre: "Bandita",
-        descripcion: "Al finalizar un combate, cura 8 de HP.",
-        icono: "reliquia_bandita",
-        clase: "shelly",
-        enPoolRecompensa: false,
-        precioTienda: 140,
-        trigger: "AL_FINALIZAR_COMBATE",
-        efectos: [{ tipo: "CURAR_HP", valor: 8, objetivo: "PROPIO" }]
-    },
-    cocoroch: {
-        id: "cocoroch",
-        nombre: "Cocoroch",
-        descripcion: "Cada vez que inflijas daño de ataque a un enemigo, le aplica 1 de Veneno.",
-        icono: "reliquia_cocoroch",
-        clase: "crow",
-        enPoolRecompensa: false,
-        precioTienda: 150,
-        trigger: "AL_INFLIGIR_DANIO",
-        efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "ENEMIGO", estadoId: "VENENO" }]
-    },
-    dinamita: {
-        id: "dinamita",
-        nombre: "Dinamita",
-        descripcion: "Cada 3 cartas que juegues en un mismo turno, inflige 5 de daño a todos los enemigos.",
-        icono: "reliquia_dinamita",
-        clase: "asesino",
-        enPoolRecompensa: true,
-        precioTienda: 150,
-        trigger: "AL_JUGAR_CARTA",
-        condicion: { tipo: "CARTAS_TURNO_MULTIPLO", divisor: 3 },
-        efectos: [{ tipo: "DANIO", valor: 5, objetivo: "TODOS_ENEMIGOS", fuente: "RELIQUIA" }]
-    },
-    sangre_vengativa: {
-        id: "sangre_vengativa",
-        nombre: "Sangre Vengativa",
-        descripcion: "Cada vez que perdés HP por un ataque enemigo, ganás +1 de Fuerza.",
-        icono: "reliquia_sangre_vengativa",
-        clase: "combate",
-        enPoolRecompensa: true,
-        precioTienda: 160,
-        trigger: "AL_RECIBIR_DANIO",
-        condicion: { tipo: "DANIO_RECIBIDO_MAYOR_A", minimo: 0 },
-        efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "PROPIO", estadoId: "FUERZA" }]
-    },
-    distintivo_abogado: {
-        id: "distintivo_abogado",
-        nombre: "Distintivo de Abogado",
-        descripcion: "Al inicio de cada combate, gana 10 de bloqueo.",
-        icono: "reliquia_distintivo_abogado",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 125,
-        trigger: "AL_INICIAR_COMBATE",
-        efectos: [{ tipo: "BLOQUEO", valor: 10, objetivo: "PROPIO" }]
-    },
-    lluvia_espinas: {
-        id: "lluvia_espinas",
-        nombre: "Lluvia de Espinas",
-        descripcion: "Al inicio del combate, gana 3 de Espinas (devuelve daño al ser atacado).",
-        icono: "reliquia_espinas",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 140,
-        trigger: "AL_INICIAR_COMBATE",
-        efectos: [{ tipo: "APLICAR_ESTADO", valor: 3, objetivo: "PROPIO", estadoId: "ESPINAS" }]
-    },
-    mancuernas: {
-        id: "mancuernas",
-        nombre: "Mancuernas",
-        descripcion: "Si terminás tu turno sin haber jugado ataques, ganás +2 de Fuerza por el resto del combate.",
-        icono: "reliquia_mancuernas",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 155,
-        trigger: "AL_TERMINAR_TURNO",
-        condicion: { tipo: "ATAQUES_TURNO_IGUAL", cantidad: 0 },
-        efectos: [{ tipo: "APLICAR_ESTADO", valor: 2, objetivo: "PROPIO", estadoId: "FUERZA" }]
-    },
-    pala: {
-        id: "pala",
-        nombre: "Pala",
-        descripcion: "Al inicio del combate, aplica 1 de Vulnerable a TODOS los enemigos.",
-        icono: "reliquia_pala",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 135,
-        trigger: "AL_INICIAR_COMBATE",
-        efectos: [{ tipo: "APLICAR_ESTADO", valor: 1, objetivo: "TODOS_ENEMIGOS", estadoId: "VULNERABLE" }]
-    },
-    cofre_clash: {
-        id: "cofre_clash",
-        nombre: "Cofre de Clash Royale",
-        descripcion: "Al comienzo del combate, roba 2 cartas adicionales.",
-        icono: "reliquia_cofre_clash",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 145,
-        trigger: "AL_INICIAR_COMBATE",
-        efectos: [{ tipo: "ROBAR_CARTA", valor: 2, objetivo: "PROPIO" }]
-    },
-    girasol: {
-        id: "girasol",
-        nombre: "Girasol",
-        descripcion: "Cada 3 turnos, gana 1 de Energía adicional.",
-        icono: "reliquia_girasol",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 165,
-        trigger: "AL_INICIAR_TURNO",
-        condicion: { tipo: "TURNO_MULTIPLO", divisor: 3 },
-        efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
-    },
-    spooky: {
-        id: "spooky",
-        nombre: "Spooky",
-        descripcion: "En el turno 2 de cada combate, otorga 8 de bloqueo a TODOS los aliados.",
-        icono: "reliquia_spooky",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 140,
-        trigger: "AL_INICIAR_TURNO",
-        condicion: { tipo: "TURNO_EXACTO", turno: 2 },
-        efectos: [{ tipo: "BLOQUEO", valor: 8, objetivo: "TODOS_ALIADOS" }]
-    },
-    oso_en_punto: {
-        id: "oso_en_punto",
-        nombre: "Las oso en punto",
-        descripcion: "En el turno 8, inflige 50 de daño a todos los enemigos.",
-        icono: "reliquia_oso_en_punto",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 150,
-        trigger: "AL_INICIAR_TURNO",
-        condicion: { tipo: "TURNO_EXACTO", turno: 8 },
-        efectos: [{ tipo: "DANIO", valor: 50, objetivo: "TODOS_ENEMIGOS", fuente: "RELIQUIA" }]
-    },
-    sanacion: {
-        id: "sanacion",
-        nombre: "Sanación",
-        descripcion: "Al iniciar un combate, cura 2 de HP.",
-        icono: "reliquia_sanacion",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 115,
-        trigger: "AL_INICIAR_COMBATE",
-        efectos: [{ tipo: "CURAR_HP", valor: 2, objetivo: "PROPIO" }]
-    },
-    elixir: {
-        id: "elixir",
-        nombre: "Elixir",
-        descripcion: "Al iniciar un combate, gana 1 de energía.",
-        icono: "reliquia_elixir",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 155,
-        trigger: "AL_INICIAR_COMBATE",
-        efectos: [{ tipo: "GANAR_ENERGIA", valor: 1, objetivo: "PROPIO" }]
-    },
-    reloj_par: {
-        id: "reloj_par",
-        nombre: "Reloj par",
-        descripcion: "Al inicio de cada turno PAR, gana 4 de bloqueo.",
-        icono: "reliquia_reloj_par",
-        clase: "neutral",
-        enPoolRecompensa: true,
-        precioTienda: 135,
-        trigger: "AL_INICIAR_TURNO",
-        condicion: { tipo: "TURNO_PARIDAD", esPar: true },
-        efectos: [{ tipo: "BLOQUEO", valor: 4, objetivo: "PROPIO" }]
-    }
+const ReliquiasIniciales_1 = require("./AlmacenReliquias/ReliquiasIniciales");
+const ReliquiasNeutrales_1 = require("./AlmacenReliquias/ReliquiasNeutrales");
+const ReliquiasLadron_1 = require("./AlmacenReliquias/ReliquiasLadron");
+const ReliquiasCombate_1 = require("./AlmacenReliquias/ReliquiasCombate");
+const ReliquiasAsesino_1 = require("./AlmacenReliquias/ReliquiasAsesino");
+// ================= VARIABLES EDITABLES DE RAREZAS Y PRECIOS =================
+exports.PRECIOS_RELIQUIA_POR_CALIDAD = {
+    INICIAL: 150,
+    COMUN: 135,
+    EPICA: 210,
+    LEGENDARIA: 300,
+    ESPECIAL: 250
 };
-function obtenerPrecioReliquia(reliquiaId) {
-    return exports.CATALOGO_RELIQUIAS[reliquiaId]?.precioTienda ?? 145;
+exports.PROBABILIDADES_RELIQUIA = {
+    ELITE: { COMUN: 70, EPICA: 25, LEGENDARIA: 5 },
+    COFRE: { COMUN: 70, EPICA: 25, LEGENDARIA: 5 },
+    TIENDA: { COMUN: 70, EPICA: 25, LEGENDARIA: 5 },
+    EVENTO: { COMUN: 70, EPICA: 25, LEGENDARIA: 5 },
+    JEFE: { COMUN: 0, EPICA: 65, LEGENDARIA: 35 }
+};
+const TODAS_LAS_RELIQUIAS = [
+    ...ReliquiasIniciales_1.RELIQUIAS_INICIALES,
+    ...ReliquiasNeutrales_1.RELIQUIAS_NEUTRALES,
+    ...ReliquiasLadron_1.RELIQUIAS_LADRON,
+    ...ReliquiasCombate_1.RELIQUIAS_COMBATE,
+    ...ReliquiasAsesino_1.RELIQUIAS_ASESINO
+];
+exports.CATALOGO_RELIQUIAS = {};
+for (const rel of TODAS_LAS_RELIQUIAS) {
+    if (exports.CATALOGO_RELIQUIAS[rel.id]) {
+        console.error(`[Reliquias] ¡ID duplicado detectado!: "${rel.id}"`);
+    }
+    exports.CATALOGO_RELIQUIAS[rel.id] = {
+        ...rel,
+        precioTienda: rel.precioTienda ?? exports.PRECIOS_RELIQUIA_POR_CALIDAD[rel.calidad]
+    };
 }
-function obtenerReliquiasRecompensa(jugadoresMap, cantidad, personajeFiltro) {
-    const yaObtenidas = new Set();
+function obtenerPrecioReliquia(reliquiaId) {
+    const data = exports.CATALOGO_RELIQUIAS[reliquiaId];
+    if (!data)
+        return exports.PRECIOS_RELIQUIA_POR_CALIDAD.COMUN;
+    return data.precioTienda ?? exports.PRECIOS_RELIQUIA_POR_CALIDAD[data.calidad];
+}
+function sortearCalidadReliquia(contexto) {
+    const probs = exports.PROBABILIDADES_RELIQUIA[contexto] || exports.PROBABILIDADES_RELIQUIA.ELITE;
+    const total = probs.COMUN + probs.EPICA + probs.LEGENDARIA;
+    const tirada = Math.random() * Math.max(1, total);
+    if (tirada < probs.LEGENDARIA)
+        return "LEGENDARIA";
+    if (tirada < probs.LEGENDARIA + probs.EPICA)
+        return "EPICA";
+    return "COMUN";
+}
+function obtenerReliquiasRecompensa(jugadoresMap, cantidad, personajeFiltro, contexto = "ELITE", forzarCalidad, excluirIdsExtras) {
+    const yaObtenidas = new Set(excluirIdsExtras ? Array.from(excluirIdsExtras) : []);
     const clasesValidas = new Set(["neutral"]);
     if (personajeFiltro && GameTypes_1.PERSONAJES_INFO[personajeFiltro]) {
         GameTypes_1.PERSONAJES_INFO[personajeFiltro].clases.forEach((c) => clasesValidas.add(c));
@@ -195,35 +71,36 @@ function obtenerReliquiasRecompensa(jugadoresMap, cantidad, personajeFiltro) {
     }
     jugadoresMap.forEach((j) => {
         if (j.reliquias) {
-            for (const rId of j.reliquias) {
+            for (const rId of j.reliquias)
                 yaObtenidas.add(rId);
-            }
         }
         if (j.reliquiaRecompensa) {
             yaObtenidas.add(j.reliquiaRecompensa);
         }
     });
     const candidatasPool = Object.values(exports.CATALOGO_RELIQUIAS).filter((r) => r.enPoolRecompensa && clasesValidas.has(r.clase));
-    const noRepetidas = candidatasPool.filter((r) => !yaObtenidas.has(r.id)).map((r) => r.id);
-    const todasValidas = candidatasPool.map((r) => r.id);
-    mezclar(noRepetidas);
-    mezclar(todasValidas);
     const resultado = [];
-    for (const id of noRepetidas) {
-        if (resultado.length >= cantidad)
+    for (let i = 0; i < cantidad; i++) {
+        const calidadBuscada = forzarCalidad || sortearCalidadReliquia(contexto);
+        // 1. Calidad buscada, sin repetir
+        let pool = candidatasPool.filter((r) => r.calidad === calidadBuscada && !yaObtenidas.has(r.id));
+        // 2. Cualquier calidad válida, sin repetir
+        if (pool.length === 0) {
+            pool = candidatasPool.filter((r) => !yaObtenidas.has(r.id));
+        }
+        // 3. Fallback: misma calidad aunque repetida
+        if (pool.length === 0) {
+            pool = candidatasPool.filter((r) => r.calidad === calidadBuscada);
+        }
+        // 4. Fallback total
+        if (pool.length === 0) {
+            pool = candidatasPool;
+        }
+        if (pool.length === 0)
             break;
-        resultado.push(id);
-    }
-    let idxFallback = 0;
-    while (resultado.length < cantidad && todasValidas.length > 0) {
-        resultado.push(todasValidas[idxFallback % todasValidas.length]);
-        idxFallback++;
+        const elegida = pool[Math.floor(Math.random() * pool.length)];
+        resultado.push(elegida.id);
+        yaObtenidas.add(elegida.id);
     }
     return resultado;
-}
-function mezclar(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
 }

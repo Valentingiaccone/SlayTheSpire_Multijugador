@@ -85,7 +85,7 @@ export class AccionAplicarDanio implements IAccionCombate {
         }
 
         const multFuerza = this.extra.multiplicadorFuerza ?? 1;
-        const monto =
+        let monto =
             this.fuente === "ATAQUE_CARTA" || this.fuente === "ATAQUE_ENEMIGO"
                 ? CalculadoraCombate.calcularDanioAtaque(
                       this.danioBase,
@@ -95,11 +95,55 @@ export class AccionAplicarDanio implements IAccionCombate {
                   )
                 : Math.max(0, this.danioBase);
 
+        // --- NUEVAS MECÁNICAS NITROMEME ANTES DEL GOLPE ---
+        if (this.defensor instanceof EnemyState) {
+            // Vuelo (-50% daño, se rompe con golpes)
+            if ((this.defensor.estados.get("VUELO") || 0) > 0) {
+                monto = Math.floor(monto * 0.5);
+                const golpesRecibidos = (this.defensor.estados.get("GOLPES_RECIBIDOS") || 0) + 1;
+                this.defensor.estados.set("GOLPES_RECIBIDOS", golpesRecibidos);
+                if (golpesRecibidos >= (3 * state.jugadores.size) + 1) {
+                    this.defensor.estados.delete("VUELO");
+                    cola.encolarAlInicio(new AccionAplicarEstado(this.defensor, "ATURDIDO", 1));
+                }
+            }
+
+            // Asustadizo (Bloqueo al recibir el primer golpe del turno)
+            const asustadizo = this.defensor.estados.get("ASUSTADIZO") || 0;
+            if (asustadizo > 0 && !this.defensor.estados.has("ASUSTADIZO_USADO")) {
+                this.defensor.estados.set("ASUSTADIZO_USADO", 1);
+                this.defensor.bloqueo += asustadizo; // Agrega el bloqueo ANTES de recibir este golpe
+                cola.emitirVisual({
+                    tipo: "BLOQUEO_GANADO",
+                    entidadId: this.defensor.uid,
+                    cantidad: asustadizo,
+                    bloqueoTotal: this.defensor.bloqueo
+                });
+            }
+
+            // Reflejar
+            if ((this.defensor.estados.get("REFLEJAR") || 0) > 0) {
+                if (monto > 0 && this.atacante && this.atacante.hp > 0) {
+                    cola.encolarAlFinal(new AccionAplicarDanio(this.defensor, this.atacante, monto, "EFECTO_DIRECTO"));
+                }
+            }
+        }
+
+        // --- CÁLCULO ESTÁNDAR ---
+        const bloqueoAntes = this.defensor.bloqueo;
         const ignoraBloqueo = this.fuente === "VENENO";
         const danioBloqueado = ignoraBloqueo ? 0 : Math.min(this.defensor.bloqueo, monto);
         const danioRestante = Math.max(0, monto - danioBloqueado);
 
         this.defensor.bloqueo = Math.max(0, this.defensor.bloqueo - danioBloqueado);
+
+        // Enterrado (Stun si le rompen el escudo)
+        if (this.defensor instanceof EnemyState && (this.defensor.estados.get("ENTERRADO") || 0) > 0) {
+            if (bloqueoAntes > 0 && this.defensor.bloqueo === 0) {
+                this.defensor.estados.delete("ENTERRADO");
+                cola.encolarAlFinal(new AccionAplicarEstado(this.defensor, "ATURDIDO", 1));
+            }
+        }
 
         let hpPerdidoReal = 0;
         if (this.defensor instanceof PlayerState) {
@@ -125,65 +169,53 @@ export class AccionAplicarDanio implements IAccionCombate {
             fuente: this.fuente
         });
 
+        // Oro para el jugador
         if (this.atacante instanceof PlayerState && this.defensor instanceof EnemyState) {
             if (hpPerdidoReal > 0 && this.extra.oroPorGolpeAlHp && this.extra.oroPorGolpeAlHp > 0) {
-                cola.encolarAlInicio(
-                    new AccionModificarOro(this.atacante, this.extra.oroPorGolpeAlHp)
-                );
+                cola.encolarAlInicio(new AccionModificarOro(this.atacante, this.extra.oroPorGolpeAlHp));
             }
-
             if (this.defensor.hp <= 0 && this.extra.oroSiMata && this.extra.oroSiMata > 0) {
-                cola.encolarAlInicio(
-                    new AccionModificarOro(this.atacante, this.extra.oroSiMata)
-                );
+                cola.encolarAlInicio(new AccionModificarOro(this.atacante, this.extra.oroSiMata));
             }
         }
 
-        if (
-            this.defensor instanceof PlayerState &&
-            this.atacante instanceof EnemyState &&
-            this.fuente === "ATAQUE_ENEMIGO"
-        ) {
+        // --- EFECTOS NITROMEME POST-GOLPE Y ESPINAS ---
+        if (this.defensor instanceof PlayerState && this.atacante instanceof EnemyState && this.fuente === "ATAQUE_ENEMIGO") {
             if (hpPerdidoReal > 0) {
-                bus.emitir("AL_RECIBIR_DANIO", {
-                    state,
-                    cola,
-                    defensor: this.defensor,
-                    atacante: this.atacante,
-                    danioRecibido: hpPerdidoReal,
-                    fuente: this.fuente
-                });
+                bus.emitir("AL_RECIBIR_DANIO", { state, cola, defensor: this.defensor, atacante: this.atacante, danioRecibido: hpPerdidoReal, fuente: this.fuente });
             }
-
+            
             const espinas = this.defensor.estados.get("ESPINAS") || 0;
             if (espinas > 0 && this.atacante.hp > 0) {
-                cola.encolarAlInicio(
-                    new AccionAplicarDanio(this.defensor, this.atacante, espinas, "ESPINAS")
-                );
+                cola.encolarAlInicio(new AccionAplicarDanio(this.defensor, this.atacante, espinas, "ESPINAS"));
+            }
+
+            // Pone Heridas (Doublé Edge / Gusano)
+            if (hpPerdidoReal > 0 && (this.atacante.estados.get("PONE_HERIDAS") || 0) > 0) {
+                cola.encolarAlFinal({
+                    ejecutar: () => {
+                        const def = this.defensor as PlayerState;
+                        def.descarteInterno.push("maldicion_herida");
+                        def.descarte.push("maldicion_herida");
+                        def.cantDescarte = def.descarteInterno.length;
+                    }
+                });
             }
         }
 
-        if (
-            this.atacante instanceof PlayerState &&
-            this.defensor instanceof EnemyState &&
-            this.fuente === "ATAQUE_CARTA"
-        ) {
+        if (this.atacante instanceof PlayerState && this.defensor instanceof EnemyState && this.fuente === "ATAQUE_CARTA") {
             if (hpPerdidoReal > 0 && this.defensor.hp > 0) {
-                bus.emitir("AL_INFLIGIR_DANIO", {
-                    state,
-                    cola,
-                    atacante: this.atacante,
-                    defensor: this.defensor,
-                    danioInfligido: hpPerdidoReal,
-                    fuente: this.fuente
-                });
+                bus.emitir("AL_INFLIGIR_DANIO", { state, cola, atacante: this.atacante, defensor: this.defensor, danioInfligido: hpPerdidoReal, fuente: this.fuente });
+                
+                // Enfurecido (Ete Bull)
+                if ((this.defensor.estados.get("ENFURECIDO") || 0) > 0) {
+                    cola.encolarAlFinal(new AccionAplicarEstado(this.defensor, "FUERZA", 1));
+                }
             }
 
             const espinasEnemigo = this.defensor.estados.get("ESPINAS") || 0;
             if (espinasEnemigo > 0 && this.atacante.hp > 0) {
-                cola.encolarAlInicio(
-                    new AccionAplicarDanio(this.defensor, this.atacante, espinasEnemigo, "ESPINAS")
-                );
+                cola.encolarAlInicio(new AccionAplicarDanio(this.defensor, this.atacante, espinasEnemigo, "ESPINAS"));
             }
         }
 
@@ -202,9 +234,12 @@ export class AccionGanarBloqueo implements IAccionCombate {
 
     ejecutar(_state: SpireState, cola: ActionQueue): void {
         if (this.objetivo.hp <= 0) return;
-        const montoFinal = this.lanzadorParaDestreza
-            ? CalculadoraCombate.calcularBloqueo(this.valor, this.lanzadorParaDestreza.estados)
-            : Math.max(0, this.valor);
+        
+        const montoFinal = CalculadoraCombate.calcularBloqueo(
+            this.valor, 
+            this.lanzadorParaDestreza?.estados, 
+            this.objetivo.estados
+        );
 
         if (montoFinal <= 0) return;
         this.objetivo.bloqueo += montoFinal;
@@ -332,6 +367,26 @@ export class AccionProcesarMuerte implements IAccionCombate {
             entidadMuerta: this.entidadMuerta,
             autorMuerte: this.autorMuerte
         });
+
+        // Explosión del Ox al morir
+        if (this.entidadMuerta instanceof EnemyState && this.entidadMuerta.enemigoId === "ox") {
+            cola.encolarAlFinal({
+                ejecutar: (st, q) => {
+                    let victima = this.autorMuerte instanceof PlayerState && this.autorMuerte.hp > 0 
+                                  ? this.autorMuerte : undefined;
+                    
+                    if (!victima) {
+                        const vivos = Array.from(st.jugadores.values()).filter(j => j.hp > 0);
+                        if (vivos.length > 0) {
+                            victima = vivos[Math.floor(Math.random() * vivos.length)];
+                        }
+                    }
+                    if (victima) {
+                        q.encolarAlInicio(new AccionAplicarDanio(this.entidadMuerta, victima, 40, "EFECTO_DIRECTO"));
+                    }
+                }
+            });
+        }
 
         cola.encolarAlFinal(new AccionVerificarFinCombate());
     }

@@ -49,6 +49,8 @@ class EnemyState extends schema_1.Schema {
         this.hpMax = 0;
         this.bloqueo = 0;
         this.intencionValor = 0;
+        this.intencionGolpes = 1;
+        this.intencionInvocarId = "";
         this.intencionTipo = "ATACAR";
         this.estados = new schema_1.MapSchema();
         this.indicePatron = 0;
@@ -77,6 +79,12 @@ __decorate([
     (0, schema_1.type)("number")
 ], EnemyState.prototype, "intencionValor", void 0);
 __decorate([
+    (0, schema_1.type)("number")
+], EnemyState.prototype, "intencionGolpes", void 0);
+__decorate([
+    (0, schema_1.type)("string")
+], EnemyState.prototype, "intencionInvocarId", void 0);
+__decorate([
     (0, schema_1.type)("string")
 ], EnemyState.prototype, "intencionTipo", void 0);
 __decorate([
@@ -95,33 +103,49 @@ class PlayerState extends schema_1.Schema {
         this.energia = 3;
         this.energiaMax = 3;
         this.oro = GameTypes_1.ECONOMIA_CONFIG.ORO_INICIAL;
+        this.hpPerdidoCombate = 0;
         this.turnoTerminado = false;
         this.nodoVotadoId = "";
         this.reliquiaCofreVotadaId = "";
-        // Recompensas post-combate
         this.recompensaElegida = false;
         this.opcionesRecompensa = new schema_1.ArraySchema();
         this.reliquiaRecompensa = "";
         this.oroRecompensa = 0;
-        // Estado en Fogata y Tienda
         this.fogataCompletada = false;
         this.tiendaCompletada = false;
         this.tiendaEliminacionUsada = false;
         this.tiendaCartas = new schema_1.ArraySchema();
         this.tiendaReliquias = new schema_1.ArraySchema();
-        // Cartas y Reliquias
+        this.eventoCompletado = false;
+        this.eventoVotoOpcion = -1;
+        this.eventoOpcionCartas = new schema_1.ArraySchema();
+        this.eventoOpcionReliquias = new schema_1.ArraySchema();
+        this.eventoOpcionMaldiciones = new schema_1.ArraySchema();
+        // SISTEMA DE SELECCIÓN MANUAL DE CARTAS
+        this.motivoSeleccionMano = "NINGUNO";
+        this.cantSeleccionManoMin = 0;
+        this.cantSeleccionManoMax = 0;
         this.mano = new schema_1.ArraySchema();
         this.mazoMaestro = new schema_1.ArraySchema();
+        this.pilaRobo = new schema_1.ArraySchema();
+        this.descarte = new schema_1.ArraySchema();
+        this.agotadas = new schema_1.ArraySchema();
         this.reliquias = new schema_1.ArraySchema();
         this.estados = new schema_1.MapSchema();
+        this.contadoresReliquias = new schema_1.MapSchema();
+        this.accionReliquiaPendienteTipo = "";
+        this.accionReliquiaPendienteParam = "";
+        this.accionReliquiaPendienteRestantes = 0;
         this.cantPilaRobo = 0;
         this.cantDescarte = 0;
-        // Variables internas de servidor
+        this.cantAgotadas = 0;
         this.pilaRoboInterna = [];
         this.descarteInterno = [];
+        this.agotadasInterno = [];
         this.cartasJugadasTurno = 0;
         this.ataquesJugadosTurno = 0;
         this.cartasJugadasCombate = 0;
+        this.colaAccionesReliquiaPendientes = [];
     }
     aplicarDatosPersonaje(personajeId) {
         const info = GameTypes_1.PERSONAJES_INFO[personajeId];
@@ -168,6 +192,9 @@ __decorate([
     (0, schema_1.type)("number")
 ], PlayerState.prototype, "oro", void 0);
 __decorate([
+    (0, schema_1.type)("number")
+], PlayerState.prototype, "hpPerdidoCombate", void 0);
+__decorate([
     (0, schema_1.type)("boolean")
 ], PlayerState.prototype, "turnoTerminado", void 0);
 __decorate([
@@ -204,6 +231,30 @@ __decorate([
     (0, schema_1.type)(["string"])
 ], PlayerState.prototype, "tiendaReliquias", void 0);
 __decorate([
+    (0, schema_1.type)("boolean")
+], PlayerState.prototype, "eventoCompletado", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], PlayerState.prototype, "eventoVotoOpcion", void 0);
+__decorate([
+    (0, schema_1.type)(["string"])
+], PlayerState.prototype, "eventoOpcionCartas", void 0);
+__decorate([
+    (0, schema_1.type)(["string"])
+], PlayerState.prototype, "eventoOpcionReliquias", void 0);
+__decorate([
+    (0, schema_1.type)(["string"])
+], PlayerState.prototype, "eventoOpcionMaldiciones", void 0);
+__decorate([
+    (0, schema_1.type)("string")
+], PlayerState.prototype, "motivoSeleccionMano", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], PlayerState.prototype, "cantSeleccionManoMin", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], PlayerState.prototype, "cantSeleccionManoMax", void 0);
+__decorate([
     (0, schema_1.type)(["string"])
 ], PlayerState.prototype, "mano", void 0);
 __decorate([
@@ -211,20 +262,46 @@ __decorate([
 ], PlayerState.prototype, "mazoMaestro", void 0);
 __decorate([
     (0, schema_1.type)(["string"])
+], PlayerState.prototype, "pilaRobo", void 0);
+__decorate([
+    (0, schema_1.type)(["string"])
+], PlayerState.prototype, "descarte", void 0);
+__decorate([
+    (0, schema_1.type)(["string"])
+], PlayerState.prototype, "agotadas", void 0);
+__decorate([
+    (0, schema_1.type)(["string"])
 ], PlayerState.prototype, "reliquias", void 0);
 __decorate([
     (0, schema_1.type)({ map: "number" })
 ], PlayerState.prototype, "estados", void 0);
+__decorate([
+    (0, schema_1.type)({ map: "number" })
+], PlayerState.prototype, "contadoresReliquias", void 0);
+__decorate([
+    (0, schema_1.type)("string")
+], PlayerState.prototype, "accionReliquiaPendienteTipo", void 0);
+__decorate([
+    (0, schema_1.type)("string")
+], PlayerState.prototype, "accionReliquiaPendienteParam", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], PlayerState.prototype, "accionReliquiaPendienteRestantes", void 0);
 __decorate([
     (0, schema_1.type)("number")
 ], PlayerState.prototype, "cantPilaRobo", void 0);
 __decorate([
     (0, schema_1.type)("number")
 ], PlayerState.prototype, "cantDescarte", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], PlayerState.prototype, "cantAgotadas", void 0);
 class SpireState extends schema_1.Schema {
     constructor() {
         super(...arguments);
         this.faseActual = "LOBBY";
+        this.mapaActual = 1;
+        this.ambientacionActual = "BRAWL_STARS";
         this.pisoActual = 1;
         this.turnoNumero = 1;
         this.nodoActualId = "";
@@ -237,15 +314,27 @@ class SpireState extends schema_1.Schema {
         this.hayConflictoCofre = false;
         this.tiempoCuentaRegresivaCofre = 0;
         this.reliquiasCofre = new schema_1.ArraySchema();
+        this.eventoActualId = "";
+        this.hayEmpateEvento = false;
+        this.opcionGanadoraEventoIdx = -1;
+        this.tiempoCuentaRegresivaEvento = 0;
         this.jugadores = new schema_1.MapSchema();
         this.enemigos = new schema_1.ArraySchema();
         this.nodosMapa = new schema_1.ArraySchema();
+        this.ordenAmbientacionesRun = ["BRAWL_STARS", "CLASH_ROYALE", "POKEMON", "NITROMEME"];
+        this.combateFinalizando = false;
     }
 }
 exports.SpireState = SpireState;
 __decorate([
     (0, schema_1.type)("string")
 ], SpireState.prototype, "faseActual", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], SpireState.prototype, "mapaActual", void 0);
+__decorate([
+    (0, schema_1.type)("string")
+], SpireState.prototype, "ambientacionActual", void 0);
 __decorate([
     (0, schema_1.type)("number")
 ], SpireState.prototype, "pisoActual", void 0);
@@ -282,6 +371,18 @@ __decorate([
 __decorate([
     (0, schema_1.type)(["string"])
 ], SpireState.prototype, "reliquiasCofre", void 0);
+__decorate([
+    (0, schema_1.type)("string")
+], SpireState.prototype, "eventoActualId", void 0);
+__decorate([
+    (0, schema_1.type)("boolean")
+], SpireState.prototype, "hayEmpateEvento", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], SpireState.prototype, "opcionGanadoraEventoIdx", void 0);
+__decorate([
+    (0, schema_1.type)("number")
+], SpireState.prototype, "tiempoCuentaRegresivaEvento", void 0);
 __decorate([
     (0, schema_1.type)({ map: PlayerState })
 ], SpireState.prototype, "jugadores", void 0);

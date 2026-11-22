@@ -1,26 +1,34 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.REGLAS_NODOS_MAPA = exports.CONFIG_MAPA = void 0;
+exports.obtenerCantidadPisosMapa = obtenerCantidadPisosMapa;
 exports.generarMapaRun = generarMapaRun;
 exports.CONFIG_MAPA = {
-    CANTIDAD_PISOS: 8,
+    TOTAL_MAPAS: 3,
+    PISOS_POR_MAPA: {
+        1: 16,
+        2: 15,
+        3: 14
+    },
+    CANTIDAD_PISOS: 16,
     COLUMNAS: 5,
     MIN_HOJAS_INICIO: 3,
     MAX_HOJAS_INICIO: 4,
-    SEGUNDOS_CUENTA_REGRESIVA: 3
+    SEGUNDOS_CUENTA_REGRESIVA: 3,
+    PROBABILIDAD_INTERROGANTE_FALSO: 3
 };
-/**
- * Reglas aplicadas en pisos intermedios (Piso 2 hasta totalPisos - 2).
- * El piso (totalPisos - 1) tiene garantizado 100% HOGUERA antes del JEFE.
- */
+function obtenerCantidadPisosMapa(numeroMapa = 1) {
+    return exports.CONFIG_MAPA.PISOS_POR_MAPA[numeroMapa] || exports.CONFIG_MAPA.CANTIDAD_PISOS;
+}
 exports.REGLAS_NODOS_MAPA = {
-    ELITE: { min: 2, max: 4, probabilidad: 20 },
-    TIENDA: { min: 1, max: 3, probabilidad: 18 },
-    COFRE: { min: 1, max: 2, probabilidad: 14 },
-    HOGUERA: { min: 1, max: 2, probabilidad: 15 }
+    EVENTO: { min: 4, max: 7, probabilidad: 35 },
+    ELITE: { min: 3, max: 5, probabilidad: 25 },
+    TIENDA: { min: 3, max: 5, probabilidad: 20 },
+    COFRE: { min: 3, max: 4, probabilidad: 15 },
+    HOGUERA: { min: 4, max: 5, probabilidad: 20 }
 };
-function generarMapaRun() {
-    const totalPisos = Math.max(4, exports.CONFIG_MAPA.CANTIDAD_PISOS);
+function generarMapaRun(numeroMapa = 1) {
+    const totalPisos = Math.max(4, obtenerCantidadPisosMapa(numeroMapa));
     const totalCols = exports.CONFIG_MAPA.COLUMNAS;
     const mapaPorPiso = new Map();
     for (let p = 1; p <= totalPisos; p++) {
@@ -34,7 +42,7 @@ function generarMapaRun() {
     const colsPiso1 = colsDisponibles.slice(0, cantHojas).sort((a, b) => a - b);
     for (const col of colsPiso1) {
         mapaPorPiso.get(1).set(col, {
-            id: `p1_c${col}`,
+            id: `m${numeroMapa}_p1_c${col}`,
             piso: 1,
             columna: col,
             tipo: "COMBATE",
@@ -59,10 +67,9 @@ function generarMapaRun() {
             const elegidas = candidatas.slice(0, cantConexiones).sort((a, b) => a - b);
             for (const colDestino of elegidas) {
                 if (!pisoSiguiente.has(colDestino)) {
-                    // Si el piso destino es el anteúltimo (totalPisos - 1), nace directamente como HOGUERA
                     const esFilaPreJefe = p + 1 === totalPisos - 1;
                     pisoSiguiente.set(colDestino, {
-                        id: `p${p + 1}_c${colDestino}`,
+                        id: `m${numeroMapa}_p${p + 1}_c${colDestino}`,
                         piso: p + 1,
                         columna: colDestino,
                         tipo: esFilaPreJefe ? "HOGUERA" : "COMBATE",
@@ -81,7 +88,7 @@ function generarMapaRun() {
     // 3. Último Piso: Único nodo JEFE
     const colJefe = Math.floor(totalCols / 2);
     const nodoJefe = {
-        id: `p${totalPisos}_jefe`,
+        id: `m${numeroMapa}_p${totalPisos}_jefe`,
         piso: totalPisos,
         columna: colJefe,
         tipo: "JEFE",
@@ -89,13 +96,12 @@ function generarMapaRun() {
         siguientesIds: []
     };
     mapaPorPiso.get(totalPisos).set(colJefe, nodoJefe);
-    // Todos los nodos de la fila de Fogatas (totalPisos - 1) conectan al Jefe
     const nodosAnteultimo = Array.from(mapaPorPiso.get(totalPisos - 1).values());
     for (const nodo of nodosAnteultimo) {
         nodo.tipo = "HOGUERA";
         nodo.siguientesIds.push(nodoJefe.id);
     }
-    // 4. Distribuir ELITE, TIENDA, COFRE y HOGUERA extra entre Piso 2 y (totalPisos - 2)
+    // 4. Distribuir tipos intermedios y camuflar interrogantes falsos
     distribuirTiposNodosIntermedios(mapaPorPiso, totalPisos);
     const resultado = [];
     for (let p = 1; p <= totalPisos; p++) {
@@ -133,6 +139,14 @@ function distribuirTiposNodosIntermedios(mapaPorPiso, totalPisos) {
                 nodo.tipo = tipo;
                 conteoActual[tipo]++;
                 break;
+            }
+        }
+    }
+    for (const nodo of nodosIntermedios) {
+        if (nodo.tipo !== "EVENTO") {
+            if (Math.random() * 100 < exports.CONFIG_MAPA.PROBABILIDAD_INTERROGANTE_FALSO) {
+                nodo.tipoRealOculto = nodo.tipo;
+                nodo.tipo = "EVENTO";
             }
         }
     }

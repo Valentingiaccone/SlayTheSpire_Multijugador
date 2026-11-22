@@ -1,13 +1,6 @@
 import { Room, Client } from "colyseus";
 import { SpireState, PlayerState } from "./schema/SpireState";
-import {
-    MENSAJES,
-    PersonajeId,
-    PERSONAJES_INFO,
-    EventoVisualCombate,
-    TipoAccionFogata,
-    IPayloadAccionEvento
-} from "../../../assets/cliente/compartido/GameTypes";
+import { MENSAJES, PersonajeId, PERSONAJES_INFO, EventoVisualCombate, TipoAccionFogata, IPayloadAccionEvento } from "../../../assets/cliente/compartido/GameTypes";
 import { obtenerMazoInicial } from "../../../assets/cliente/compartido/Cartas";
 import { CONFIG_MAPA, TipoNodoMapa } from "../../../assets/cliente/compartido/Mapa";
 import { MapService } from "./services/MapService";
@@ -18,6 +11,7 @@ import { ShopService } from "./services/ShopService";
 import { EventService } from "./services/EventService";
 import { CombatCoordinator } from "./services/CombatCoordinator";
 import { RelicEngine } from "../engine/RelicEngine";
+import { CombatEngine } from "../engine/CombatEngine";
 
 export class SpireRoom extends Room<SpireState> {
     maxClients = 4;
@@ -47,9 +41,7 @@ export class SpireRoom extends Room<SpireState> {
             this.mapService.abrirFaseMapa();
         };
 
-        this.mapService = new MapService(this.state, this.clock, (tipoNodo) =>
-            this.alViajarANodo(tipoNodo)
-        );
+        this.mapService = new MapService(this.state, this.clock, (tipoNodo) => this.alViajarANodo(tipoNodo));
         this.chestService = new ChestService(this.state, this.clock, avanzarAlMapa);
         this.rewardService = new RewardService(this.state, avanzarAlMapa);
         this.campfireService = new CampfireService(this.state, avanzarAlMapa);
@@ -66,9 +58,7 @@ export class SpireRoom extends Room<SpireState> {
     }
 
     onJoin(client: Client, options: { nombre?: string }): void {
-        if (this.state.faseActual !== "LOBBY") {
-            throw new Error("La partida ya está en curso.");
-        }
+        if (this.state.faseActual !== "LOBBY") throw new Error("La partida ya está en curso.");
 
         const jugador = new PlayerState();
         jugador.sessionId = client.sessionId;
@@ -89,30 +79,14 @@ export class SpireRoom extends Room<SpireState> {
         }
 
         switch (this.state.faseActual) {
-            case "LOBBY":
-                this.verificarInicioPartida();
-                break;
-            case "MAP":
-                this.mapService.evaluarVotos();
-                break;
-            case "COMBAT":
-                this.combatCoordinator.verificarFinTurnoJugadores();
-                break;
-            case "REWARD":
-                this.rewardService.verificarFinRecompensas();
-                break;
-            case "CHEST":
-                if (this.state.cofreAbierto) this.chestService.evaluarVotos();
-                break;
-            case "CAMPFIRE":
-                this.campfireService.verificarFinFogata();
-                break;
-            case "SHOP":
-                this.shopService.verificarFinTienda();
-                break;
-            case "EVENT":
-                this.eventService.verificarFinEvento();
-                break;
+            case "LOBBY": this.verificarInicioPartida(); break;
+            case "MAP": this.mapService.evaluarVotos(); break;
+            case "COMBAT": this.combatCoordinator.verificarFinTurnoJugadores(); break;
+            case "REWARD": this.rewardService.verificarFinRecompensas(); break;
+            case "CHEST": if (this.state.cofreAbierto) this.chestService.evaluarVotos(); break;
+            case "CAMPFIRE": this.campfireService.verificarFinFogata(); break;
+            case "SHOP": this.shopService.verificarFinTienda(); break;
+            case "EVENT": this.eventService.verificarFinEvento(); break;
         }
     }
 
@@ -121,7 +95,6 @@ export class SpireRoom extends Room<SpireState> {
             if (this.state.faseActual !== "LOBBY") return;
             const jugador = this.state.jugadores.get(client.sessionId);
             if (!jugador || !PERSONAJES_INFO[data?.personajeId]) return;
-
             jugador.aplicarDatosPersonaje(data.personajeId);
             jugador.listo = false;
         });
@@ -130,7 +103,6 @@ export class SpireRoom extends Room<SpireState> {
             if (this.state.faseActual !== "LOBBY") return;
             const jugador = this.state.jugadores.get(client.sessionId);
             if (!jugador) return;
-
             jugador.listo = !jugador.listo;
             this.verificarInicioPartida();
         });
@@ -140,28 +112,27 @@ export class SpireRoom extends Room<SpireState> {
         });
 
         this.onMessage(MENSAJES.TERMINAR_TURNO, (client) => {
+            const jugador = this.state.jugadores.get(client.sessionId);
+            if (jugador && jugador.motivoSeleccionMano !== "NINGUNO") return;
             this.combatCoordinator.terminarTurnoJugador(client.sessionId);
         });
 
         this.onMessage(MENSAJES.JUGAR_CARTA, (client, data: { indiceMano: number; objetivoId?: string }) => {
             if (!data || typeof data.indiceMano !== "number") return;
+            const jugador = this.state.jugadores.get(client.sessionId);
+            if (jugador && jugador.motivoSeleccionMano !== "NINGUNO") return; // Bloquea si hay selección pendiente
             this.combatCoordinator.jugarCarta(client.sessionId, data.indiceMano, data.objetivoId);
         });
 
-        this.onMessage(
-            MENSAJES.ELEGIR_RECOMPENSA,
-            (
-                client,
-                data: { cartaId: string | null; tomarReliquia?: boolean; tomarOro?: boolean }
-            ) => {
-                this.rewardService.elegirRecompensa(
-                    client.sessionId,
-                    data?.cartaId ?? null,
-                    Boolean(data?.tomarReliquia),
-                    Boolean(data?.tomarOro)
-                );
-            }
-        );
+        // NUEVO MENSAJE DE SELECCIÓN DE CARTAS MANUAL
+        this.onMessage(MENSAJES.RESPONDER_SELECCION_MANO, (client, data: { indices: number[] }) => {
+            if (!data || !Array.isArray(data.indices)) return;
+            this.combatCoordinator.resolverSeleccionMano(client.sessionId, data.indices);
+        });
+
+        this.onMessage(MENSAJES.ELEGIR_RECOMPENSA, (client, data: { cartaId: string | null; tomarReliquia?: boolean; tomarOro?: boolean }) => {
+            this.rewardService.elegirRecompensa(client.sessionId, data?.cartaId ?? null, Boolean(data?.tomarReliquia), Boolean(data?.tomarOro));
+        });
 
         this.onMessage(MENSAJES.ABRIR_COFRE, (client) => {
             this.chestService.abrirCofre(client.sessionId);
@@ -204,14 +175,50 @@ export class SpireRoom extends Room<SpireState> {
             this.eventService.registrarVotoComunitario(client.sessionId, data.indiceOpcion);
         });
 
-        this.onMessage(
-            MENSAJES.RESOLVER_ACCION_RELIQUIA,
-            (client, data: { indiceMazo?: number; terminar?: boolean }) => {
-                const jugador = this.state.jugadores.get(client.sessionId);
-                if (!jugador) return;
-                RelicEngine.resolverAccionPendiente(jugador, data || {});
+        this.onMessage(MENSAJES.RESOLVER_ACCION_RELIQUIA, (client, data: { indiceMazo?: number; terminar?: boolean }) => {
+            const jugador = this.state.jugadores.get(client.sessionId);
+            if (!jugador) return;
+            RelicEngine.resolverAccionPendiente(jugador, data || {});
+        });
+
+        // Atajos de teclado para testeo local rápido (Teclas 1 a 6)
+        this.onMessage("debug_comando", (client, data: { accion: string }) => {
+            const jugador = this.state.jugadores.get(client.sessionId);
+            if (!jugador || !data?.accion) return;
+
+            switch (data.accion) {
+                case "IR_FOGATA":
+                    if (this.state.faseActual === "MAP") this.campfireService.iniciarEventoFogata();
+                    break;
+                case "IR_TIENDA":
+                    jugador.oro += 300;
+                    if (this.state.faseActual === "MAP") this.shopService.iniciarEventoTienda();
+                    break;
+                case "IR_COFRE":
+                    if (this.state.faseActual === "MAP") this.chestService.iniciarEventoCofre();
+                    break;
+                case "GANAR_COMBATE":
+                    if (this.state.faseActual === "COMBAT") {
+                        // Código original y seguro:
+                        this.state.enemigos.forEach((e) => { e.hp = 0; });
+                        if (this.state.esCombateJefe && this.state.mapaActual >= CONFIG_MAPA.TOTAL_MAPAS) {
+                            this.state.faseActual = "VICTORY";
+                        } else {
+                            this.rewardService.prepararRecompensas();
+                            this.state.faseActual = "REWARD";
+                        }
+                    }
+                    break;
+                case "BUFF_TEST":
+                    jugador.energia += 5;
+                    jugador.oro += 100;
+                    jugador.estados.set("FUERZA", (jugador.estados.get("FUERZA") || 0) + 10);
+                    break;
+                case "IR_EVENTO":
+                    if (this.state.faseActual === "MAP") this.eventService.iniciarEventoAleatorio();
+                    break;
             }
-        );
+        });
 
         this.onMessage(MENSAJES.REINICIAR_PARTIDA, (client) => {
             if (!this.state.jugadores.has(client.sessionId)) return;
@@ -246,6 +253,9 @@ export class SpireRoom extends Room<SpireState> {
                 j.eventoOpcionMaldiciones.clear();
                 j.reliquias.clear();
                 j.contadoresReliquias.clear();
+                j.motivoSeleccionMano = "NINGUNO";
+                j.cantSeleccionManoMin = 0;
+                j.cantSeleccionManoMax = 0;
                 j.accionReliquiaPendienteTipo = "";
                 j.accionReliquiaPendienteParam = "";
                 j.accionReliquiaPendienteRestantes = 0;
@@ -255,73 +265,27 @@ export class SpireRoom extends Room<SpireState> {
 
             this.state.faseActual = "LOBBY";
         });
-
-        // Atajos de teclado para testeo local rápido (Teclas 1 a 6)
-        this.onMessage("debug_comando", (client, data: { accion: string }) => {
-            const jugador = this.state.jugadores.get(client.sessionId);
-            if (!jugador || !data?.accion) return;
-
-            switch (data.accion) {
-                case "IR_FOGATA":
-                    this.campfireService.iniciarEventoFogata();
-                    break;
-                case "IR_TIENDA":
-                    jugador.oro += 300;
-                    this.shopService.iniciarEventoTienda();
-                    break;
-                case "IR_COFRE":
-                    this.chestService.iniciarEventoCofre();
-                    break;
-                case "GANAR_COMBATE":
-                    if (this.state.faseActual === "COMBAT") {
-                        this.state.enemigos.forEach((e) => {
-                            e.hp = 0;
-                        });
-                        if (this.state.esCombateJefe && this.state.mapaActual >= CONFIG_MAPA.TOTAL_MAPAS) {
-                            this.state.faseActual = "VICTORY";
-                        } else {
-                            this.rewardService.prepararRecompensas();
-                            this.state.faseActual = "REWARD";
-                        }
-                    }
-                    break;
-                case "BUFF_TEST":
-                    jugador.energia += 5;
-                    jugador.oro += 100;
-                    jugador.estados.set("FUERZA", (jugador.estados.get("FUERZA") || 0) + 10);
-                    break;
-                case "IR_EVENTO":
-                    this.eventService.iniciarEventoAleatorio();
-                    break;
-            }
-        });
     }
 
     private verificarInicioPartida(): void {
         if (this.state.jugadores.size === 0) return;
         let todosListos = true;
-        this.state.jugadores.forEach((j) => {
-            if (!j.listo) todosListos = false;
-        });
-
+        this.state.jugadores.forEach((j) => { if (!j.listo) todosListos = false; });
         if (!todosListos) return;
 
         this.state.jugadores.forEach((j) => {
             j.aplicarDatosPersonaje(j.personajeId);
             j.mazoMaestro.clear();
             obtenerMazoInicial(j.personajeId).forEach((id) => j.mazoMaestro.push(id));
-
             j.reliquias.clear();
             j.contadoresReliquias.clear();
+            j.motivoSeleccionMano = "NINGUNO";
             j.accionReliquiaPendienteTipo = "";
             j.accionReliquiaPendienteParam = "";
             j.accionReliquiaPendienteRestantes = 0;
             j.colaAccionesReliquiaPendientes = [];
-
             const info = PERSONAJES_INFO[j.personajeId];
-            if (info?.reliquiaInicial) {
-                RelicEngine.otorgarReliquia(this.state, j, info.reliquiaInicial, false);
-            }
+            if (info?.reliquiaInicial) RelicEngine.otorgarReliquia(this.state, j, info.reliquiaInicial, false);
             j.nodoVotadoId = "";
         });
 
@@ -330,28 +294,13 @@ export class SpireRoom extends Room<SpireState> {
 
     private alViajarANodo(tipoNodo: TipoNodoMapa): void {
         switch (tipoNodo) {
-            case "JEFE":
-                this.combatCoordinator.iniciarCombate("JEFE");
-                break;
-            case "ELITE":
-                this.combatCoordinator.iniciarCombate("ELITE");
-                break;
-            case "COFRE":
-                this.chestService.iniciarEventoCofre();
-                break;
-            case "HOGUERA":
-                this.campfireService.iniciarEventoFogata();
-                break;
-            case "TIENDA":
-                this.shopService.iniciarEventoTienda();
-                break;
-            case "EVENTO":
-                this.eventService.iniciarEventoAleatorio();
-                break;
-            case "COMBATE":
-            default:
-                this.combatCoordinator.iniciarCombate("COMBATE");
-                break;
+            case "JEFE": this.combatCoordinator.iniciarCombate("JEFE"); break;
+            case "ELITE": this.combatCoordinator.iniciarCombate("ELITE"); break;
+            case "COFRE": this.chestService.iniciarEventoCofre(); break;
+            case "HOGUERA": this.campfireService.iniciarEventoFogata(); break;
+            case "TIENDA": this.shopService.iniciarEventoTienda(); break;
+            case "EVENTO": this.eventService.iniciarEventoAleatorio(); break;
+            case "COMBATE": default: this.combatCoordinator.iniciarCombate("COMBATE"); break;
         }
     }
 }

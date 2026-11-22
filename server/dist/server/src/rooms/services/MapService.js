@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MapService = void 0;
 const SpireState_1 = require("../schema/SpireState");
 const Mapa_1 = require("../../../../assets/cliente/compartido/Mapa");
+const Enemigos_1 = require("../../../../assets/cliente/compartido/Enemigos");
 class MapService {
     constructor(state, clock, onViajarANodoCallback) {
         this.state = state;
@@ -11,21 +12,45 @@ class MapService {
         this.timerMapa = null;
     }
     inicializarMapaNuevaRun() {
+        const mundos = [...Enemigos_1.TODAS_LAS_AMBIENTACIONES];
+        for (let i = mundos.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [mundos[i], mundos[j]] = [mundos[j], mundos[i]];
+        }
+        this.state.ordenAmbientacionesRun = mundos;
+        this.state.mapaActual = 1;
+        this.state.ambientacionActual = mundos[0];
+        this.construirNodosDelMapaActual();
+        this.abrirFaseMapa();
+    }
+    avanzarAlSiguienteMapa() {
+        this.state.mapaActual += 1;
+        const idxMundo = (this.state.mapaActual - 1) % this.state.ordenAmbientacionesRun.length;
+        this.state.ambientacionActual = this.state.ordenAmbientacionesRun[idxMundo];
+        // Curar a todos los jugadores al 100% al cambiar de mapa
+        this.state.jugadores.forEach((j) => {
+            j.hp = j.hpMax;
+            j.bloqueo = 0;
+        });
+        this.construirNodosDelMapaActual();
+        this.abrirFaseMapa();
+    }
+    construirNodosDelMapaActual() {
         this.state.nodosMapa.clear();
         this.state.nodoActualId = "";
         this.state.pisoActual = 1;
-        const datosMapa = (0, Mapa_1.generarMapaRun)();
+        const datosMapa = (0, Mapa_1.generarMapaRun)(this.state.mapaActual);
         for (const d of datosMapa) {
             const nodoSchema = new SpireState_1.MapNodeState();
             nodoSchema.id = d.id;
             nodoSchema.piso = d.piso;
             nodoSchema.columna = d.columna;
             nodoSchema.tipo = d.tipo;
+            nodoSchema.tipoRealOculto = d.tipoRealOculto;
             nodoSchema.estado = d.estado;
             d.siguientesIds.forEach((sigId) => nodoSchema.siguientesIds.push(sigId));
             this.state.nodosMapa.push(nodoSchema);
         }
-        this.abrirFaseMapa();
     }
     abrirFaseMapa() {
         this.cancelarCuentaRegresiva();
@@ -129,6 +154,10 @@ class MapService {
             else if (n.estado === "DISPONIBLE" && n.id !== nodoElegido.id)
                 n.estado = "BLOQUEADO";
         });
+        if (nodoElegido.tipoRealOculto) {
+            nodoElegido.tipo = nodoElegido.tipoRealOculto;
+            nodoElegido.tipoRealOculto = undefined;
+        }
         nodoElegido.estado = "ACTUAL";
         this.state.nodoActualId = nodoElegido.id;
         this.state.pisoActual = nodoElegido.piso;
