@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChestService = void 0;
 const Reliquias_1 = require("../../../../assets/cliente/compartido/Reliquias");
 const Mapa_1 = require("../../../../assets/cliente/compartido/Mapa");
-const RelicEngine_1 = require("../../engine/RelicEngine");
 class ChestService {
     constructor(state, clock, onCofreCompletadoCallback) {
         this.state = state;
@@ -29,8 +28,7 @@ class ChestService {
         this.state.cofreAbierto = true;
         this.state.reliquiasCofre.clear();
         const cantJugadores = Math.max(1, this.state.jugadores.size);
-        const forzarLegendaria = RelicEngine_1.RelicEngine.consumirCargasCofreLegendario(this.state);
-        const reliquiasGeneradas = (0, Reliquias_1.obtenerReliquiasRecompensa)(this.state.jugadores, cantJugadores, undefined, "COFRE", forzarLegendaria ? "LEGENDARIA" : undefined);
+        const reliquiasGeneradas = (0, Reliquias_1.obtenerReliquiasRecompensa)(this.state.jugadores, cantJugadores);
         reliquiasGeneradas.forEach((rId) => this.state.reliquiasCofre.push(rId));
     }
     votarReliquia(sessionId, reliquiaId) {
@@ -99,9 +97,8 @@ class ChestService {
     entregarReliquiasYAvanzar() {
         this.state.jugadores.forEach((j) => {
             if (j.reliquiaCofreVotadaId) {
-                const relId = j.reliquiaCofreVotadaId;
+                j.reliquias.push(j.reliquiaCofreVotadaId);
                 j.reliquiaCofreVotadaId = "";
-                RelicEngine_1.RelicEngine.otorgarReliquia(this.state, j, relId, true);
             }
         });
         this.onCofreCompletadoCallback();

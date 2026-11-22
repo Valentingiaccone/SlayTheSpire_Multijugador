@@ -142,10 +142,4 @@ export class CombatCoordinator {
             this.onEntrarEnFaseRecompensa();
         }
     }
-
-    public resolverSeleccionMano(sessionId: string, indices: number[]): void {
-        const jugador = this.state.jugadores.get(sessionId);
-        if (!jugador) return;
-        CombatEngine.resolverSeleccionMano(this.state, jugador, indices);
-    }
 }

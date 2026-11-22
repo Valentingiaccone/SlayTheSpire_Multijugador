@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CampfireService = void 0;
 const GameTypes_1 = require("../../../../assets/cliente/compartido/GameTypes");
 const Cartas_1 = require("../../../../assets/cliente/compartido/Cartas");
-const RelicEngine_1 = require("../../engine/RelicEngine");
 class CampfireService {
     constructor(state, onFogataCompletadaCallback) {
         this.state = state;
@@ -13,7 +12,6 @@ class CampfireService {
         this.state.jugadores.forEach((j) => {
             j.fogataCompletada = false;
         });
-        RelicEngine_1.RelicEngine.dispararAlIngresarFogata(this.state);
         this.state.faseActual = "CAMPFIRE";
     }
     procesarAccionFogata(sessionId, accion) {
@@ -47,10 +45,10 @@ class CampfireService {
                 if (typeof idx !== "number" || idx < 0 || idx >= jugador.mazoMaestro.length)
                     return;
                 const cartaActualId = jugador.mazoMaestro[idx];
-                const cartaMejoradaId = (0, Cartas_1.obtenerIdCartaMejoradaPreservandoExtras)(cartaActualId);
-                if (!cartaMejoradaId)
+                const cartaMejorada = (0, Cartas_1.obtenerCartaMejorada)(cartaActualId);
+                if (!cartaMejorada)
                     return;
-                jugador.mazoMaestro[idx] = cartaMejoradaId;
+                jugador.mazoMaestro[idx] = cartaMejorada.id;
                 jugador.fogataCompletada = true;
                 break;
             }

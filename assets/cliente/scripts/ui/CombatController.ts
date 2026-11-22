@@ -70,16 +70,6 @@ export class CombatController extends Component {
             () => {
                 const state = NetworkManager.instance?.room?.state;
                 if (state) this.onEstadoCambiado(state);
-            },
-            // Callback para CARTA_DESCARTADA
-            (cartaInstanciaId: string, destino: Vec3) => {
-                const scriptCarta = this.obtenerCardViewDesdeMano(cartaInstanciaId);
-                if (scriptCarta) scriptCarta.animarDescarte(destino);
-            },
-            // Callback para CARTA_AGOTADA
-            (cartaInstanciaId: string, destino: Vec3) => {
-                const scriptCarta = this.obtenerCardViewDesdeMano(cartaInstanciaId);
-                if (scriptCarta) scriptCarta.animarAgotar(destino);
             }
         );
     }
@@ -314,25 +304,6 @@ export class CombatController extends Component {
                 gratisEsteTurno
             );
         });
-    }
-
-    private obtenerCardViewDesdeMano(cartaInstanciaId: string): CardView | undefined {
-        for (const nodo of this.nodosCartas) {
-            if (!nodo.active) continue;
-            // Podrías necesitar comparar el ID interno si lo guardas, 
-            // o simplemente tomar el primero disponible.
-            // Para asegurar precisión, sería ideal guardar la ID en el CardView.
-            // Por simplicidad en la UI de cartas en mano, tomamos el CardView
-            // que tenga configurada esa carta (requerirá añadir un getCartaId() en CardView, 
-            // o lo hacemos genérico por posición).
-            
-            const cardView = nodo.getComponent(CardView);
-            // Esto asume que el CardView expone el ID; si no, lo editaremos.
-            if (cardView && (cardView as any).cartaData?.id === cartaInstanciaId) {
-                return cardView;
-            }
-        }
-        return undefined;
     }
 
     private detectarObjetivoBajoCursor(tipo: "ENEMIGO" | "ALIADO", touchPos: Vec3): string | undefined {

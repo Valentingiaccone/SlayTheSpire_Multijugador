@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Label, Sprite, Color, UIOpacity, Vec3, tween, ParticleSystem2D, EventTouch } from 'cc';
+import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite, Color } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
 import {
     CATALOGO_ENCANTAMIENTOS,
@@ -21,8 +21,6 @@ export class CardView extends Component {
     @property(Label) labelTipo: Label = null!;
     @property(Sprite) imagen: Sprite = null!;
     @property(Node) nodoEncantado: Node = null!;
-    @property(ParticleSystem2D)
-    particulasFuego: ParticleSystem2D | null = null;
 
     private indiceMano: number = -1;
     private cartaData: ICartaData | null = null;
@@ -53,61 +51,6 @@ export class CardView extends Component {
     onDisable() {
         this.arrastrando = false;
         this.ultimoObjetivoHoverId = undefined;
-    }
-
-    public animarDescarte(posicionMazoDescarte: Vec3, alTerminar?: () => void) {
-        // Nos aseguramos de que la carta tenga el componente para controlar la opacidad
-        let uiOpacity = this.getComponent(UIOpacity);
-        if (!uiOpacity) uiOpacity = this.addComponent(UIOpacity);
-
-        // Tween de posición y escala (Se achica y viaja hacia el mazo)
-        tween(this.node)
-            .to(0.4, { position: posicionMazoDescarte, scale: new Vec3(0.2, 0.2, 1) }, { easing: 'quadIn' })
-            .start();
-        
-        // Tween de opacidad (Se desvanece)
-        tween(uiOpacity)
-            .to(0.4, { opacity: 0 })
-            .call(() => {
-                if (alTerminar) alTerminar();
-                this.node.destroy(); // Destruye el nodo visualmente al terminar
-            })
-            .start();
-    }
-
-    public animarAgotar(posicionCentro: Vec3, alTerminar?: () => void) {
-        let uiOpacity = this.getComponent(UIOpacity);
-        if (!uiOpacity) uiOpacity = this.addComponent(UIOpacity);
-
-        // Movemos la carta al centro de la pantalla
-        tween(this.node)
-            .to(0.2, { position: posicionCentro, scale: new Vec3(1.2, 1.2, 1) }, { easing: 'backOut' })
-            .call(() => {
-                // Cuando llega al centro, encendemos el fuego
-                if (this.particulasFuego) {
-                    this.particulasFuego.resetSystem(); // Inicia el fuego
-                }
-                
-                // Oscurecemos la carta (efecto de quemado)
-                const sprite = this.getComponent(Sprite);
-                if (sprite) {
-                    tween(sprite)
-                        .to(0.3, { color: new Color(50, 50, 50, 255) }) // Se pone negra
-                        .start();
-                }
-            })
-            .delay(0.5) // Esperamos medio segundo mientras se quema
-            .call(() => {
-                // La desaparecemos
-                tween(uiOpacity)
-                    .to(0.3, { opacity: 0 })
-                    .call(() => {
-                        if (alTerminar) alTerminar();
-                        this.node.destroy();
-                    })
-                    .start();
-            })
-            .start();
     }
 
     public configurar(

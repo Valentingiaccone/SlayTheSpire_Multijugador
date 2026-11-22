@@ -1,4 +1,4 @@
-export type AmbientacionId = "BRAWL_STARS" | "CLASH_ROYALE" | "POKEMON" | "NITROMEME";
+export type AmbientacionId = "BRAWL_STARS" | "CLASH_ROYALE" | "POKEMON";
 export type CategoriaEnemigo = "NORMAL" | "ELITE" | "JEFE";
 
 export type TipoIntencion =
@@ -10,29 +10,18 @@ export type TipoIntencion =
     | "APLICAR_VULNERABLE"
     | "APLICAR_DEBIL"
     | "CURAR_ALIADOS"
-    | "INVOCAR"
-    // NUEVAS DE NITROMEME
-    | "APLICAR_FRAGIL"
-    | "GANAR_REFLEJAR"
-    | "GANAR_RITUAL"
-    | "GANAR_ENFURECIDO"
-    | "GANAR_ENTERRADO"
-    | "GANAR_PONE_HERIDAS"
-    | "ESCUDO_AREA"
-    | "BLOQUEAR_Y_VULNERABLE";
+    | "INVOCAR";
 
 export const NOMBRES_AMBIENTACION: Record<AmbientacionId, string> = {
     BRAWL_STARS: "Brawl Stars",
     CLASH_ROYALE: "Clash Royale",
-    POKEMON: "Pokémon",
-    NITROMEME: "Nitrome"
+    POKEMON: "Pokémon"
 };
 
 export const TODAS_LAS_AMBIENTACIONES: AmbientacionId[] = [
     "BRAWL_STARS",
     "CLASH_ROYALE",
-    "POKEMON",
-    "NITROMEME"
+    "POKEMON"
 ];
 
 // ================= VARIABLES DE BALANCEO =================
@@ -49,18 +38,37 @@ export interface IConfigEscaladoMapa {
     aumentoMinimoAccion: number;
 }
 
+/**
+ * Escalado por número de mapa (1, 2 y 3).
+ * Todos los aumentos redondean hacia abajo (Math.floor) respetando el aumento mínimo.
+ */
 export const ESCALADO_ENEMIGOS_POR_MAPA: Record<number, IConfigEscaladoMapa> = {
-    1: { porcentajeVidaExtra: 0, aumentoMinimoVida: 0, porcentajeAccionExtra: 0, aumentoMinimoAccion: 0 },
-    2: { porcentajeVidaExtra: 0.70, aumentoMinimoVida: 2, porcentajeAccionExtra: 0.5, aumentoMinimoAccion: 2 },
-    3: { porcentajeVidaExtra: 1.50, aumentoMinimoVida: 4, porcentajeAccionExtra: 1, aumentoMinimoAccion: 4 }
+    1: {
+        porcentajeVidaExtra: 0,
+        aumentoMinimoVida: 0,
+        porcentajeAccionExtra: 0,
+        aumentoMinimoAccion: 0
+    },
+    2: {
+        porcentajeVidaExtra: 0.70, // +70% vida
+        aumentoMinimoVida: 2,
+        porcentajeAccionExtra: 0.5, // +50% daño, bloqueo, fuerza, espinas y curación
+        aumentoMinimoAccion: 2
+    },
+    3: {
+        porcentajeVidaExtra: 1.50, // +150% vida
+        aumentoMinimoVida: 4,
+        porcentajeAccionExtra: 1, // +100% daño, bloqueo, fuerza, espinas y curación
+        aumentoMinimoAccion: 4
+    }
 };
 
 export interface IIntencionPatron {
     tipo: TipoIntencion;
     valorMin: number;
     valorMax: number;
-    golpes?: number; 
-    invocarEnemigoId?: string;
+    golpes?: number; // Para ataques multi-golpe (ej: 2x2 -> valorMin: 2, valorMax: 2, golpes: 2)
+    invocarEnemigoId?: string; // ID del enemigo a invocar cuando tipo === "INVOCAR"
 }
 
 export interface IEnemigoInfo {
@@ -394,167 +402,55 @@ export const ENEMIGOS_INFO: Record<string, IEnemigoInfo> = {
             { tipo: "ATACAR", valorMin: 5, valorMax: 5, golpes: 3 },
             { tipo: "APLICAR_VULNERABLE", valorMin: 2, valorMax: 2 }
         ]
-    },
-
-    // =========================================================================
-    // MUNDO 4: NITROMEME
-    // =========================================================================
-    dark: {
-        id: "dark",
-        nombre: "Dark",
-        ambientacion: "NITROMEME",
-        categoria: "NORMAL",
-        espacio: 1,
-        hpMin: 3,
-        hpMax: 5,
-        patron: [
-            { tipo: "ATACAR", valorMin: 1, valorMax: 2 },
-            { tipo: "GANAR_FUERZA", valorMin: 1, valorMax: 2 }
-        ]
-    },
-    bad_ice_creams: {
-        id: "bad_ice_creams",
-        nombre: "Bad Ice Creams",
-        ambientacion: "NITROMEME",
-        categoria: "NORMAL",
-        espacio: 2,
-        hpMin: 30,
-        hpMax: 30,
-        patron: [
-            { tipo: "ESCUDO_AREA", valorMin: 6, valorMax: 8 },
-            { tipo: "APLICAR_DEBIL", valorMin: 3, valorMax: 3 },
-            { tipo: "APLICAR_FRAGIL", valorMin: 3, valorMax: 3 }
-        ]
-    },
-    roly_poly: {
-        id: "roly_poly",
-        nombre: "Roly Poly",
-        ambientacion: "NITROMEME",
-        categoria: "NORMAL",
-        espacio: 3,
-        hpMin: 40,
-        hpMax: 40,
-        patron: [
-            { tipo: "GANAR_ESPINAS", valorMin: 2, valorMax: 2 },
-            { tipo: "BLOQUEAR", valorMin: 6, valorMax: 6 },
-            { tipo: "ATACAR", valorMin: 7, valorMax: 7 }
-        ]
-    },
-    twin_shot: {
-        id: "twin_shot",
-        nombre: "Twin Shot",
-        ambientacion: "NITROMEME",
-        categoria: "NORMAL",
-        espacio: 3,
-        hpMin: 25,
-        hpMax: 30,
-        patron: [
-            { tipo: "ATACAR", valorMin: 3, valorMax: 3, golpes: 3 },
-            { tipo: "GANAR_FUERZA", valorMin: 1, valorMax: 1 }
-        ]
-    },
-    luciergana: {
-        id: "luciergana",
-        nombre: "👹 Luciergana",
-        ambientacion: "NITROMEME",
-        categoria: "ELITE",
-        espacio: 7,
-        hpMin: 85,
-        hpMax: 95,
-        patron: [
-            { tipo: "ATACAR", valorMin: 8, valorMax: 8 },
-            { tipo: "BLOQUEAR", valorMin: 20, valorMax: 20 },
-            { tipo: "GANAR_REFLEJAR", valorMin: 1, valorMax: 1 }
-        ]
-    },
-    ox: {
-        id: "ox",
-        nombre: "👹 Ox",
-        ambientacion: "NITROMEME",
-        categoria: "ELITE",
-        espacio: 7,
-        hpMin: 1,
-        hpMax: 1,
-        patron: [
-            { tipo: "ATACAR", valorMin: 1, valorMax: 1 }
-        ]
-    },
-    double_edge: {
-        id: "double_edge",
-        nombre: "👹 Doublé Edge",
-        ambientacion: "NITROMEME",
-        categoria: "ELITE",
-        espacio: 7,
-        hpMin: 120,
-        hpMax: 120,
-        patron: [
-            { tipo: "GANAR_RITUAL", valorMin: 1, valorMax: 1 },
-            { tipo: "ATACAR_Y_BLOQUEAR", valorMin: 7, valorMax: 7 },
-            { tipo: "ATACAR", valorMin: 3, valorMax: 3, golpes: 2 }
-        ]
-    },
-    ete_bull: {
-        id: "ete_bull",
-        nombre: "💀 Ete Bull",
-        ambientacion: "NITROMEME",
-        categoria: "JEFE",
-        espacio: 10,
-        hpMin: 220,
-        hpMax: 250,
-        patron: [
-            { tipo: "GANAR_ENFURECIDO", valorMin: 1, valorMax: 1 },
-            { tipo: "ATACAR", valorMin: 8, valorMax: 8 },
-            { tipo: "ATACAR", valorMin: 1, valorMax: 1, golpes: 5 },
-            { tipo: "BLOQUEAR_Y_VULNERABLE", valorMin: 20, valorMax: 20 }
-        ]
-    },
-    comida_para_gusano: {
-        id: "comida_para_gusano",
-        nombre: "💀 Comida para gusano",
-        ambientacion: "NITROMEME",
-        categoria: "JEFE",
-        espacio: 10,
-        hpMin: 280,
-        hpMax: 300,
-        patron: [
-            { tipo: "GANAR_PONE_HERIDAS", valorMin: 1, valorMax: 1 },
-            { tipo: "ATACAR", valorMin: 15, valorMax: 15 },
-            { tipo: "ATACAR", valorMin: 4, valorMax: 4, golpes: 3 },
-            { tipo: "GANAR_ENTERRADO", valorMin: 60, valorMax: 60 }
-        ]
     }
 };
 
+/** Sortea un entero aleatorio entre min y max (ambos inclusive) */
 export function sortearRangoEntero(min: number, max: number): number {
     if (max <= min) return min;
     return min + Math.floor(Math.random() * (max - min + 1));
 }
 
+/** Aplica el escalado de vida del mapa actual redondeando hacia abajo y respetando el mínimo */
 export function escalarVidaEnemigo(hpBase: number, numeroMapa: number): number {
     const cfg = ESCALADO_ENEMIGOS_POR_MAPA[numeroMapa];
-    if (!cfg || (cfg.porcentajeVidaExtra <= 0 && cfg.aumentoMinimoVida <= 0)) return hpBase;
+    if (!cfg || (cfg.porcentajeVidaExtra <= 0 && cfg.aumentoMinimoVida <= 0)) {
+        return hpBase;
+    }
     const aumento = Math.max(cfg.aumentoMinimoVida, Math.floor(hpBase * cfg.porcentajeVidaExtra));
     return hpBase + aumento;
 }
 
+/** Aplica el escalado de acción (daño por golpe, bloqueo, fuerza, espinas, curación) según el mapa */
 export function escalarAccionEnemigo(valorBase: number, tipo: TipoIntencion, numeroMapa: number): number {
     const escalaEsteTipo =
-        tipo === "ATACAR" || tipo === "BLOQUEAR" || tipo === "ATACAR_Y_BLOQUEAR" ||
-        tipo === "GANAR_FUERZA" || tipo === "GANAR_ESPINAS" || tipo === "CURAR_ALIADOS" ||
-        tipo === "ESCUDO_AREA" || tipo === "BLOQUEAR_Y_VULNERABLE" || tipo === "GANAR_ENTERRADO";
+        tipo === "ATACAR" ||
+        tipo === "BLOQUEAR" ||
+        tipo === "ATACAR_Y_BLOQUEAR" ||
+        tipo === "GANAR_FUERZA" ||
+        tipo === "GANAR_ESPINAS" ||
+        tipo === "CURAR_ALIADOS";
 
     if (!escalaEsteTipo) return valorBase;
 
     const cfg = ESCALADO_ENEMIGOS_POR_MAPA[numeroMapa];
-    if (!cfg || (cfg.porcentajeAccionExtra <= 0 && cfg.aumentoMinimoAccion <= 0)) return valorBase;
+    if (!cfg || (cfg.porcentajeAccionExtra <= 0 && cfg.aumentoMinimoAccion <= 0)) {
+        return valorBase;
+    }
     const aumento = Math.max(cfg.aumentoMinimoAccion, Math.floor(valorBase * cfg.porcentajeAccionExtra));
     return valorBase + aumento;
 }
 
-export function resolverIntencionPatron(info: IEnemigoInfo, indicePatron: number, numeroMapa: number): IIntencionResuelta {
+/** Resuelve el paso del patrón sorteando el rango interno y aplicando el escalado del mapa */
+export function resolverIntencionPatron(
+    info: IEnemigoInfo,
+    indicePatron: number,
+    numeroMapa: number
+): IIntencionResuelta {
     const paso = info.patron[indicePatron % info.patron.length];
     const valorSorteado = sortearRangoEntero(paso.valorMin, paso.valorMax);
     const valorFinal = escalarAccionEnemigo(valorSorteado, paso.tipo, numeroMapa);
+
     return {
         tipo: paso.tipo,
         valor: valorFinal,
@@ -563,42 +459,66 @@ export function resolverIntencionPatron(info: IEnemigoInfo, indicePatron: number
     };
 }
 
-export function obtenerEncuentroAleatorio(tipoCombate: "COMBATE" | "ELITE" | "JEFE", ambientacion: AmbientacionId = "BRAWL_STARS"): string[] {
-    const categoriaBuscada: CategoriaEnemigo = tipoCombate === "JEFE" ? "JEFE" : tipoCombate === "ELITE" ? "ELITE" : "NORMAL";
-    const poolMundo = Object.values(ENEMIGOS_INFO).filter((e) => e.ambientacion === ambientacion && e.categoria === categoriaBuscada);
+/**
+ * Genera un encuentro llenando hasta 10 de espacio con enemigos de la ambientación actual.
+ * - COMBATE: garantiza mínimo 1 enemigo de espacio >= 3 y rellena el espacio restante con enemigos normales.
+ * - ELITE: solo usa enemigos de categoría ELITE de esa ambientación (sin rellenar con normales).
+ * - JEFE: coloca al jefe de esa ambientación.
+ */
+export function obtenerEncuentroAleatorio(
+    tipoCombate: "COMBATE" | "ELITE" | "JEFE",
+    ambientacion: AmbientacionId = "BRAWL_STARS"
+): string[] {
+    const categoriaBuscada: CategoriaEnemigo =
+        tipoCombate === "JEFE" ? "JEFE" : tipoCombate === "ELITE" ? "ELITE" : "NORMAL";
+
+    const poolMundo = Object.values(ENEMIGOS_INFO).filter(
+        (e) => e.ambientacion === ambientacion && e.categoria === categoriaBuscada
+    );
+
     if (poolMundo.length === 0) return ["robot"];
 
     let espacioRestante = CONFIG_ENEMIGOS.ESPACIO_MAXIMO_COMBATE;
     const resultado: string[] = [];
 
     if (tipoCombate === "COMBATE") {
-        const principales = poolMundo.filter((e) => e.espacio >= CONFIG_ENEMIGOS.ESPACIO_MINIMO_ENEMIGO_PRINCIPAL && e.espacio <= espacioRestante);
+        // 1. Asegurar al menos un enemigo de espacio >= 3
+        const principales = poolMundo.filter(
+            (e) =>
+                e.espacio >= CONFIG_ENEMIGOS.ESPACIO_MINIMO_ENEMIGO_PRINCIPAL &&
+                e.espacio <= espacioRestante
+        );
+
         if (principales.length > 0) {
             const primero = principales[Math.floor(Math.random() * principales.length)];
             resultado.push(primero.id);
             espacioRestante -= primero.espacio;
         }
 
-        while (espacioRestante > 0 && resultado.length < CONFIG_ENEMIGOS.MAX_ENEMIGOS_SIMULTANEOS_EN_PANTALLA) {
+        // 2. Rellenar el espacio restante aleatoriamente con enemigos normales que quepan
+        while (
+            espacioRestante > 0 &&
+            resultado.length < CONFIG_ENEMIGOS.MAX_ENEMIGOS_SIMULTANEOS_EN_PANTALLA
+        ) {
             const candidatos = poolMundo.filter((e) => e.espacio <= espacioRestante);
             if (candidatos.length === 0) break;
+
             const elegido = candidatos[Math.floor(Math.random() * candidatos.length)];
             resultado.push(elegido.id);
             espacioRestante -= elegido.espacio;
         }
 
-        // Filtro especial: Evitar pelear SÓLO contra helados de buff
-        if (ambientacion === "NITROMEME" && resultado.length > 0 && !resultado.some((id) => id !== "bad_ice_creams")) {
-            resultado[0] = "roly_poly";
-        }
-
         return resultado;
     }
 
+    // ELITE o JEFE: rellenar únicamente con candidatos de su propia categoría sin repetir el mismo élite
     const usados = new Set<string>();
     while (espacioRestante > 0) {
-        const candidatos = poolMundo.filter((e) => e.espacio <= espacioRestante && !usados.has(e.id));
+        const candidatos = poolMundo.filter(
+            (e) => e.espacio <= espacioRestante && !usados.has(e.id)
+        );
         if (candidatos.length === 0) break;
+
         const elegido = candidatos[Math.floor(Math.random() * candidatos.length)];
         resultado.push(elegido.id);
         usados.add(elegido.id);
@@ -609,5 +529,6 @@ export function obtenerEncuentroAleatorio(tipoCombate: "COMBATE" | "ELITE" | "JE
         const fallback = poolMundo[Math.floor(Math.random() * poolMundo.length)];
         resultado.push(fallback.id);
     }
+
     return resultado;
 }

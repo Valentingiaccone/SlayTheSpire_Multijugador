@@ -1,5 +1,11 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
-import { FaseSala, PersonajeId, PERSONAJES_INFO, ECONOMIA_CONFIG, TipoAccionReliquiaPendiente, TipoMotivoSeleccionMano } from "../../../../assets/cliente/compartido/GameTypes";
+import {
+    FaseSala,
+    PersonajeId,
+    PERSONAJES_INFO,
+    ECONOMIA_CONFIG,
+    TipoAccionReliquiaPendiente
+} from "../../../../assets/cliente/compartido/GameTypes";
 import { EstadoNodoMapa, TipoNodoMapa } from "../../../../assets/cliente/compartido/Mapa";
 import { AmbientacionId, TipoIntencion } from "../../../../assets/cliente/compartido/Enemigos";
 
@@ -10,6 +16,7 @@ export class MapNodeState extends Schema {
     @type("string") tipo: TipoNodoMapa = "COMBATE";
     @type("string") estado: EstadoNodoMapa = "BLOQUEADO";
     @type(["string"]) siguientesIds = new ArraySchema<string>();
+
     tipoRealOculto?: TipoNodoMapa;
 }
 
@@ -25,6 +32,7 @@ export class EnemyState extends Schema {
     @type("string") intencionInvocarId: string = "";
     @type("string") intencionTipo: TipoIntencion = "ATACAR";
     @type({ map: "number" }) estados = new MapSchema<number>();
+
     indicePatron: number = 0;
 }
 
@@ -62,11 +70,6 @@ export class PlayerState extends Schema {
     @type(["string"]) eventoOpcionCartas = new ArraySchema<string>();
     @type(["string"]) eventoOpcionReliquias = new ArraySchema<string>();
     @type(["string"]) eventoOpcionMaldiciones = new ArraySchema<string>();
-
-    // SISTEMA DE SELECCIÓN MANUAL DE CARTAS
-    @type("string") motivoSeleccionMano: TipoMotivoSeleccionMano = "NINGUNO";
-    @type("number") cantSeleccionManoMin: number = 0;
-    @type("number") cantSeleccionManoMax: number = 0;
 
     @type(["string"]) mano = new ArraySchema<string>();
     @type(["string"]) mazoMaestro = new ArraySchema<string>();
@@ -139,6 +142,6 @@ export class SpireState extends Schema {
     @type([EnemyState]) enemigos = new ArraySchema<EnemyState>();
     @type([MapNodeState]) nodosMapa = new ArraySchema<MapNodeState>();
 
-    ordenAmbientacionesRun: AmbientacionId[] = ["BRAWL_STARS", "CLASH_ROYALE", "POKEMON", "NITROMEME"];
+    ordenAmbientacionesRun: AmbientacionId[] = ["BRAWL_STARS", "CLASH_ROYALE", "POKEMON"];
     combateFinalizando: boolean = false;
 }

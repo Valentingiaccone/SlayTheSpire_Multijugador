@@ -1,4 +1,4 @@
-import { Color, Vec3 } from "cc";
+import { Color } from "cc";
 import { EventoVisualCombate } from "../../compartido/GameTypes";
 import { CATALOGO_RELIQUIAS } from "../../compartido/Reliquias";
 import { CombatEntityView } from "./CombatEntityView";
@@ -9,10 +9,7 @@ export class CombatSequencer {
 
     constructor(
         private buscarVistaEntidad: (id: string) => CombatEntityView | undefined,
-        private alTerminarColaCallback: () => void,
-        // Agregamos una función opcional para que puedas delegarle al controlador la búsqueda de la vista de la carta
-        private onAnimarCartaDescartada?: (cartaInstanciaId: string, destinoDescarte: Vec3) => void,
-        private onAnimarCartaAgotada?: (cartaInstanciaId: string, destinoAgotar: Vec3) => void
+        private alTerminarColaCallback: () => void
     ) {}
 
     public get estaReproduciendo(): boolean {
@@ -49,36 +46,6 @@ export class CombatSequencer {
             case "CARTA_JUGADA":
                 await this.esperar(60);
                 break;
-
-            // --- NUEVOS CASOS PARA LAS ANIMACIONES DE CARTAS ---
-            case "CARTA_DESCARTADA": {
-                // Reemplaza estas coordenadas por las que obtuviste en el Inspector para tu botón de descarte
-                const posMazoDescarte = new Vec3(400, -300, 0); 
-                
-                // Disparamos el callback si existe, pasándole el ID de la carta y el destino
-                if (this.onAnimarCartaDescartada) {
-                    this.onAnimarCartaDescartada(ev.cartaInstanciaId, posMazoDescarte);
-                }
-                
-                // Esperamos un poquito para que la animación fluya
-                await this.esperar(100); 
-                break;
-            }
-
-            case "CARTA_AGOTADA": {
-                // Posición al centro de la pantalla para quemarla
-                const posCentro = new Vec3(0, 0, 0); 
-                
-                // Disparamos el callback si existe
-                if (this.onAnimarCartaAgotada) {
-                    this.onAnimarCartaAgotada(ev.cartaInstanciaId, posCentro);
-                }
-                
-                // Esperamos medio segundo para dar impacto a la animación de fuego
-                await this.esperar(500); 
-                break;
-            }
-            // ---------------------------------------------------
 
             case "ATAQUE_EJECUTADO": {
                 const atacante = this.buscarVistaEntidad(ev.atacanteId);

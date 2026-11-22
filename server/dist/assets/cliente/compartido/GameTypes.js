@@ -7,7 +7,6 @@ exports.MENSAJES = {
     VOTAR_NODO: "votar_nodo",
     JUGAR_CARTA: "jugar_carta",
     TERMINAR_TURNO: "terminar_turno",
-    RESPONDER_SELECCION_MANO: "responder_seleccion_mano",
     ELEGIR_RECOMPENSA: "elegir_recompensa",
     ABRIR_COFRE: "abrir_cofre",
     VOTAR_RELIQUIA_COFRE: "votar_reliquia_cofre",
@@ -16,9 +15,6 @@ exports.MENSAJES = {
     COMPRAR_RELIQUIA_TIENDA: "comprar_reliquia_tienda",
     ELIMINAR_CARTA_TIENDA: "eliminar_carta_tienda",
     SALIR_TIENDA: "salir_tienda",
-    ACCION_EVENTO: "accion_evento",
-    VOTAR_OPCION_EVENTO: "votar_opcion_evento",
-    RESOLVER_ACCION_RELIQUIA: "resolver_accion_reliquia",
     REINICIAR_PARTIDA: "reiniciar_partida",
     SECUENCIA_COMBATE: "secuencia_combate"
 };
@@ -41,13 +37,9 @@ exports.PERSONAJES_INFO = {
         descripcion: "Personaje simple, tiene buen ataque, defensa y forma de ganar dinero.",
         clases: ["combate", "ladron", "shelly"],
         mazoInicial: [
-            "golpe_combate", "golpe_combate", "defender_combate", "defender_combate",
-            "bash",
-            "armamento", // <- Carta añadida para testear
-            "propina", // <- Carta de ladrón añadida para testear
-            "daga_dorada", // <- Carta de ladrón añadida para testear
-            "cinturon",
-            "desarmado"
+            "golpe_combate", "golpe_combate", "golpe_combate", "golpe_combate",
+            "defender_combate", "defender_combate", "defender_combate", "defender_combate",
+            "bash"
         ],
         reliquiaInicial: "bandita"
     },

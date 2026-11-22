@@ -3,8 +3,16 @@ import { EstadoNodoMapa, TipoNodoMapa } from "./Mapa";
 import { AmbientacionId, TipoIntencion } from "./Enemigos";
 
 export type FaseSala =
-    | "LOBBY" | "MAP" | "COMBAT" | "REWARD" | "CHEST"
-    | "CAMPFIRE" | "SHOP" | "EVENT" | "VICTORY" | "DEFEAT";
+    | "LOBBY"
+    | "MAP"
+    | "COMBAT"
+    | "REWARD"
+    | "CHEST"
+    | "CAMPFIRE"
+    | "SHOP"
+    | "EVENT"
+    | "VICTORY"
+    | "DEFEAT";
 
 export const MENSAJES = {
     ELEGIR_PERSONAJE: "elegir_personaje",
@@ -12,7 +20,6 @@ export const MENSAJES = {
     VOTAR_NODO: "votar_nodo",
     JUGAR_CARTA: "jugar_carta",
     TERMINAR_TURNO: "terminar_turno",
-    RESPONDER_SELECCION_MANO: "responder_seleccion_mano",
     ELEGIR_RECOMPENSA: "elegir_recompensa",
     ABRIR_COFRE: "abrir_cofre",
     VOTAR_RELIQUIA_COFRE: "votar_reliquia_cofre",
@@ -48,7 +55,6 @@ export interface IPayloadAccionEvento {
 }
 
 export type TipoAccionReliquiaPendiente = "" | "ENCANTAR_CARTA" | "ELIMINAR_CARTAS";
-export type TipoMotivoSeleccionMano = "DESCARTAR" | "AGOTAR" | "MEJORAR" | "HACER_GRATIS" | "NINGUNO";
 
 export type PersonajeId = "SHELLY" | "CROW";
 export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow" | "maldicion";
@@ -77,13 +83,9 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
         descripcion: "Personaje simple, tiene buen ataque, defensa y forma de ganar dinero.",
         clases: ["combate", "ladron", "shelly"],
         mazoInicial: [
-            "golpe_combate", "golpe_combate", "defender_combate", "defender_combate",
-            "bash",
-            "armamento", // <- Carta añadida para testear
-            "propina",   // <- Carta de ladrón añadida para testear
-            "daga_dorada", // <- Carta de ladrón añadida para testear
-            "cinturon",
-            "desarmado"
+            "golpe_combate", "golpe_combate", "golpe_combate", "golpe_combate",
+            "defender_combate", "defender_combate", "defender_combate", "defender_combate",
+            "bash"
         ],
         reliquiaInicial: "bandita"
     },
@@ -106,17 +108,64 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
 };
 
 export type EventoVisualCombate =
-    | { tipo: "CARTA_JUGADA"; jugadorId: string; cartaId: string; objetivoId?: string; }
-    | { tipo: "ATAQUE_EJECUTADO"; atacanteId: string; objetivoId: string; indiceGolpe: number; totalGolpes: number; }
-    | { tipo: "IMPACTO_DANIO"; objetivoId: string; atacanteId?: string; danioAlHp: number; danioBloqueado: number; hpRestante: number; bloqueoRestante: number; fuente: FuenteDanio; }
-    | { tipo: "BLOQUEO_GANADO"; entidadId: string; cantidad: number; bloqueoTotal: number; }
-    | { tipo: "ESTADO_APLICADO"; entidadId: string; estadoId: EstadoId; valorAgregado: number; valorTotal: number; }
-    | { tipo: "CURACION_RECIBIDA"; entidadId: string; cantidad: number; hpActual: number; }
-    | { tipo: "ORO_CAMBIADO"; jugadorId: string; delta: number; oroTotal: number; }
-    | { tipo: "RELIQUIA_ACTIVADA"; jugadorId: string; reliquiaId: string; }
-    | { tipo: "ENTIDAD_MURIO"; entidadId: string; esEnemigo: boolean; }
-    | { tipo: "CARTA_DESCARTADA"; jugadorId: string; cartaInstanciaId: string; }
-    | { tipo: "CARTA_AGOTADA"; jugadorId: string; cartaInstanciaId: string; };
+    | {
+          tipo: "CARTA_JUGADA";
+          jugadorId: string;
+          cartaId: string;
+          objetivoId?: string;
+      }
+    | {
+          tipo: "ATAQUE_EJECUTADO";
+          atacanteId: string;
+          objetivoId: string;
+          indiceGolpe: number;
+          totalGolpes: number;
+      }
+    | {
+          tipo: "IMPACTO_DANIO";
+          objetivoId: string;
+          atacanteId?: string;
+          danioAlHp: number;
+          danioBloqueado: number;
+          hpRestante: number;
+          bloqueoRestante: number;
+          fuente: FuenteDanio;
+      }
+    | {
+          tipo: "BLOQUEO_GANADO";
+          entidadId: string;
+          cantidad: number;
+          bloqueoTotal: number;
+      }
+    | {
+          tipo: "ESTADO_APLICADO";
+          entidadId: string;
+          estadoId: EstadoId;
+          valorAgregado: number;
+          valorTotal: number;
+      }
+    | {
+          tipo: "CURACION_RECIBIDA";
+          entidadId: string;
+          cantidad: number;
+          hpActual: number;
+      }
+    | {
+          tipo: "ORO_CAMBIADO";
+          jugadorId: string;
+          delta: number;
+          oroTotal: number;
+      }
+    | {
+          tipo: "RELIQUIA_ACTIVADA";
+          jugadorId: string;
+          reliquiaId: string;
+      }
+    | {
+          tipo: "ENTIDAD_MURIO";
+          entidadId: string;
+          esEnemigo: boolean;
+      };
 
 export interface IMapaEstadosCliente {
     get(clave: EstadoId | string): number | undefined;
@@ -149,9 +198,6 @@ export interface IJugadorCliente {
     cantPilaRobo: number;
     cantDescarte: number;
     cantAgotadas: number;
-    motivoSeleccionMano: TipoMotivoSeleccionMano;
-    cantSeleccionManoMin: number;
-    cantSeleccionManoMax: number;
     mano: Iterable<string> & { length: number; [index: number]: string };
     mazoMaestro: Iterable<string> & { length: number; [index: number]: string };
     pilaRobo: Iterable<string> & { length: number; [index: number]: string };
@@ -214,7 +260,18 @@ export interface IEstadoSalaCliente {
     hayEmpateEvento: boolean;
     opcionGanadoraEventoIdx: number;
     tiempoCuentaRegresivaEvento: number;
-    jugadores: { get(sessionId: string): IJugadorCliente | undefined; forEach(cb: (jugador: IJugadorCliente, sessionId: string) => void): void; size?: number; };
-    enemigos: Iterable<IEnemigoCliente> & { length: number; [index: number]: IEnemigoCliente; forEach(cb: (enemigo: IEnemigoCliente, index: number) => void): void; };
-    nodosMapa: Iterable<INodoMapaCliente> & { length: number; forEach(cb: (nodo: INodoMapaCliente, index: number) => void): void; };
+    jugadores: {
+        get(sessionId: string): IJugadorCliente | undefined;
+        forEach(cb: (jugador: IJugadorCliente, sessionId: string) => void): void;
+        size?: number;
+    };
+    enemigos: Iterable<IEnemigoCliente> & {
+        length: number;
+        [index: number]: IEnemigoCliente;
+        forEach(cb: (enemigo: IEnemigoCliente, index: number) => void): void;
+    };
+    nodosMapa: Iterable<INodoMapaCliente> & {
+        length: number;
+        forEach(cb: (nodo: INodoMapaCliente, index: number) => void): void;
+    };
 }
