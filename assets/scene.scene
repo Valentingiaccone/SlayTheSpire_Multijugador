@@ -356,7 +356,7 @@
     },
     "_enabled": true,
     "__prefab": null,
-    "usarServidorLocal": true,
+    "usarServidorLocal": false,
     "_id": "1eRxIO3a1J+4RyLodELL89"
   },
   {

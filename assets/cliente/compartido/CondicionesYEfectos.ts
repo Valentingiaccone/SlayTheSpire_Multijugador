@@ -9,7 +9,12 @@ export type EstadoId =
     | "AVARICIA"
     | "ARRIESGAR_GANAR"
     | "SIN_ROBO"
-    | "COMBUSTION";
+    | "COMBUSTION"
+    | "MANTENER_BLOQUEO"
+    | "BLOQUEO_SIGUIENTE_TURNO"
+    | "ENERGIA_SIGUIENTE_TURNO"
+    | "PRECISION_DAGAS"
+    | "RECUPERAR_FUERZA";
 
 export type TipoObjetivo =
     | "PROPIO"
@@ -29,6 +34,8 @@ export type FuenteDanio =
     | "EFECTO_DIRECTO";
 
 export type EncantamientoId = "GRATIS";
+
+export type TipoAccionSeleccionMano = "DESCARTAR" | "AGOTAR" | "MEJORAR" | "HACER_GRATIS";
 
 export interface IInfoEncantamiento {
     id: EncantamientoId;
@@ -58,6 +65,7 @@ export type DescriptorCondicion =
     | { tipo: "HP_PORCENTAJE_MENOR_A"; porcentaje: number }
     | { tipo: "ES_COMBATE_JEFE" }
     | { tipo: "CARTA_TIPO_ES"; tipoCarta: "ATAQUE" | "HABILIDAD" | "PODER" | "MALDICION" }
+    | { tipo: "DESCARTO_EN_TURNO" }
     | { tipo: "TIENE_ESTADO"; objetivo: TipoObjetivo; estadoId: EstadoId; minimo?: number };
 
 export type DescriptorEfecto =
@@ -72,6 +80,7 @@ export type DescriptorEfecto =
           multiplicadorFuerza?: number;
           danioIgualABloqueo?: boolean;
           danioExtraPorAtaqueEnMano?: number;
+          esDaga?: boolean;
       }
     | {
           tipo: "BLOQUEO";
@@ -83,11 +92,45 @@ export type DescriptorEfecto =
           estadoId: EstadoId;
           valor: number;
           objetivo: TipoObjetivo;
+          repeticiones?: number;
+      }
+    | {
+          tipo: "REDUCIR_FUERZA_TEMPORAL";
+          valor: number;
+          objetivo: TipoObjetivo;
+      }
+    | {
+          tipo: "MULTIPLICAR_ESTADO";
+          estadoId: EstadoId;
+          multiplicador: number;
+          objetivo: TipoObjetivo;
       }
     | {
           tipo: "ROBAR_CARTA";
           valor: number;
           objetivo: "PROPIO" | "ALIADO" | "TODOS_ALIADOS";
+      }
+    | {
+          tipo: "AGREGAR_CARTA_A_MANO";
+          cartaId: string;
+          cantidad: number;
+      }
+    | {
+          tipo: "AGREGAR_PODER_ALEATORIO_GRATIS_MANO";
+          cantidad?: number;
+      }
+    | {
+          tipo: "DESCARTAR_CARTA_MANO_AZAR";
+          cantidad: number;
+      }
+    | {
+          tipo: "DESCARTAR_TODA_LA_MANO_Y_ROBAR";
+      }
+    | {
+          tipo: "SELECCIONAR_CARTAS_MANO";
+          accion: TipoAccionSeleccionMano;
+          cantidad: number;
+          efectosAlCompletar?: DescriptorEfecto[];
       }
     | {
           tipo: "GANAR_ENERGIA";

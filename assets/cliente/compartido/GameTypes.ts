@@ -1,4 +1,4 @@
-import { EstadoId, FuenteDanio } from "./CondicionesYEfectos";
+import { EstadoId, FuenteDanio, TipoAccionSeleccionMano } from "./CondicionesYEfectos";
 import { EstadoNodoMapa, TipoNodoMapa } from "./Mapa";
 import { AmbientacionId, TipoIntencion } from "./Enemigos";
 
@@ -31,6 +31,7 @@ export const MENSAJES = {
     ACCION_EVENTO: "accion_evento",
     VOTAR_OPCION_EVENTO: "votar_opcion_evento",
     RESOLVER_ACCION_RELIQUIA: "resolver_accion_reliquia",
+    RESOLVER_SELECCION_MANO: "resolver_seleccion_mano",
     REINICIAR_PARTIDA: "reiniciar_partida",
     SECUENCIA_COMBATE: "secuencia_combate"
 } as const;
@@ -55,6 +56,7 @@ export interface IPayloadAccionEvento {
 }
 
 export type TipoAccionReliquiaPendiente = "" | "ENCANTAR_CARTA" | "ELIMINAR_CARTAS";
+export type TipoSeleccionManoPendiente = "" | TipoAccionSeleccionMano;
 
 export type PersonajeId = "SHELLY" | "CROW";
 export type ClaseId = "combate" | "ladron" | "shelly" | "veneno" | "asesino" | "crow" | "maldicion";
@@ -99,9 +101,9 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
         descripcion: "Envenena a sus enemigos y lanza muchos ataques para acabar con sus enemigos.",
         clases: ["veneno", "asesino", "crow"],
         mazoInicial: [
-            "golpe_veneno", "golpe_veneno", "golpe_veneno", "golpe_veneno",
-            "defender_veneno", "defender_veneno", "defender_veneno", "defender_veneno",
-            "bash"
+            "golpe_combate", "golpe_combate", "golpe_combate", "golpe_combate",
+            "defender_combate", "defender_combate", "defender_combate", "defender_combate",
+            "neutralizar", "superviviente"
         ],
         reliquiaInicial: "cocoroch"
     }
@@ -239,6 +241,9 @@ export interface IJugadorCliente {
     accionReliquiaPendienteTipo: TipoAccionReliquiaPendiente;
     accionReliquiaPendienteParam: string;
     accionReliquiaPendienteRestantes: number;
+    seleccionManoPendienteTipo: TipoSeleccionManoPendiente;
+    seleccionManoPendienteCantidad: number;
+    seleccionManoPendienteTitulo: string;
 }
 
 export interface IEnemigoCliente {

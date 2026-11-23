@@ -93,6 +93,10 @@ export class CalculadoraCombate {
                 base += contextoExtra.ataquesEnMano * efectoDanio.danioExtraPorAtaqueEnMano;
             }
 
+            if (efectoDanio.esDaga) {
+                base += this.leerEstado(estadosLanzador, "PRECISION_DAGAS");
+            }
+
             const multFuerza = efectoDanio.multiplicadorFuerza ?? 1;
             const calculado =
                 efectoDanio.fuente === "RELIQUIA"

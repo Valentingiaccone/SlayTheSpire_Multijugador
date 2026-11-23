@@ -22,6 +22,8 @@ export interface IMejoraCartaConfig {
     nombre?: string;
     costo?: number;
     costoOro?: number;
+    agotar?: boolean;
+    minimoOtrasCartasEnMano?: number;
     descripcion: string;
     efectos: DescriptorEfecto[];
 }
@@ -33,6 +35,7 @@ export interface ICartaData {
     costoOro?: number;
     reduccionCostoPorHpPerdido?: boolean;
     requiereManoSoloAtaques?: boolean;
+    minimoOtrasCartasEnMano?: number;
     descripcion: string;
     sprite: string;
     clase: ClaseId;
@@ -46,6 +49,9 @@ export interface ICartaData {
     injugable?: boolean;
     eterea?: boolean;
     eterno?: boolean;
+    innato?: boolean;
+    duplicarAlRobar?: boolean;
+    esDaga?: boolean;
     efectos: DescriptorEfecto[];
     efectosFinTurnoEnMano?: DescriptorEfecto[];
     mejora?: IMejoraCartaConfig;
@@ -112,6 +118,9 @@ for (const base of TODAS_LAS_CARTAS_BASE) {
             nombre: base.mejora.nombre || `${base.nombre}+`,
             costo: base.mejora.costo ?? base.costo,
             costoOro: base.mejora.costoOro ?? base.costoOro,
+            agotar: base.mejora.agotar ?? base.agotar,
+            minimoOtrasCartasEnMano:
+                base.mejora.minimoOtrasCartasEnMano ?? base.minimoOtrasCartasEnMano,
             descripcion: base.mejora.descripcion,
             efectos: base.mejora.efectos,
             calidad: calidadFinal,
@@ -226,6 +235,37 @@ export function obtenerMaldicionAleatoria(): string {
     if (CARTAS_MALDICION.length === 0) return "maldicion_herida";
     const idx = Math.floor(Math.random() * CARTAS_MALDICION.length);
     return CARTAS_MALDICION[idx].id;
+}
+
+export function obtenerPoderAleatorio(
+    personajeId: PersonajeId,
+    cantidadJugadores: number = 2
+): string | undefined {
+    const infoPersonaje = PERSONAJES_INFO[personajeId];
+    const clasesPermitidas: string[] = infoPersonaje ? [...infoPersonaje.clases] : [];
+    const esJuegoSolitario = cantidadJugadores <= 1;
+
+    let candidatas = Object.values(CATALOGO_CARTAS).filter(
+        (c) =>
+            c.tipo === "PODER" &&
+            !c.esMejorada &&
+            c.enPoolRecompensa &&
+            clasesPermitidas.includes(c.clase) &&
+            (!esJuegoSolitario || !c.soloMultijugador)
+    );
+
+    if (candidatas.length === 0) {
+        candidatas = Object.values(CATALOGO_CARTAS).filter(
+            (c) =>
+                c.tipo === "PODER" &&
+                !c.esMejorada &&
+                c.enPoolRecompensa &&
+                (!esJuegoSolitario || !c.soloMultijugador)
+        );
+    }
+
+    if (candidatas.length === 0) return undefined;
+    return candidatas[Math.floor(Math.random() * candidatas.length)].id;
 }
 
 export function generarCartaPorCalidad(
