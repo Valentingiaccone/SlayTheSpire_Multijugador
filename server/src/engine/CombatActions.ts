@@ -283,25 +283,53 @@ export class AccionRobarCartas implements IAccionCombate {
         private actualizarContadoresCallback: (j: PlayerState) => void
     ) {}
 
-    ejecutar(): void {
+    ejecutar(_state?: SpireState, cola?: ActionQueue): void {
         if (this.jugador.hp <= 0 || this.cantidad <= 0) return;
         if ((this.jugador.estados.get("SIN_ROBO") || 0) > 0) return;
+
+        let loteRobadas: string[] = [];
+
+        const emitirLoteRobadas = () => {
+            if (loteRobadas.length > 0) {
+                cola?.emitirVisual({
+                    tipo: "CARTAS_ROBADAS",
+                    jugadorId: this.jugador.sessionId,
+                    cantidad: loteRobadas.length,
+                    cartasIds: [...loteRobadas]
+                });
+                loteRobadas = [];
+            }
+        };
 
         for (let i = 0; i < this.cantidad; i++) {
             if (this.jugador.mano.length >= 10) break;
 
             if (this.jugador.pilaRoboInterna.length === 0) {
                 if (this.jugador.descarteInterno.length === 0) break;
+
+                // Emitimos las cartas robadas antes de mezclar para respetar el orden visual
+                emitirLoteRobadas();
+
+                const cantMezclada = this.jugador.descarteInterno.length;
                 this.jugador.pilaRoboInterna = [...this.jugador.descarteInterno];
                 this.jugador.descarteInterno = [];
                 this.mezclarCallback(this.jugador.pilaRoboInterna);
+
+                cola?.emitirVisual({
+                    tipo: "MAZO_MEZCLADO",
+                    jugadorId: this.jugador.sessionId,
+                    cantidadCartas: cantMezclada
+                });
             }
 
             const cartaRobada = this.jugador.pilaRoboInterna.pop();
             if (cartaRobada) {
                 this.jugador.mano.push(cartaRobada);
+                loteRobadas.push(cartaRobada);
             }
         }
+
+        emitirLoteRobadas();
         this.actualizarContadoresCallback(this.jugador);
     }
 }
@@ -352,8 +380,6 @@ export class AccionVerificarFinCombate implements IAccionCombate {
 
         const quedaEnemigoVivo = state.enemigos.some((e) => e.hp > 0);
         if (!quedaEnemigoVivo) {
-            // Marcamos finalización y dejamos que AL_FINALIZAR_COMBATE (Bandita, Megahucha, Chuleta)
-            // resuelva todas sus acciones encoladas ANTES de cambiar faseActual
             state.combateFinalizando = true;
             bus.emitir("AL_FINALIZAR_COMBATE", { state, cola });
             const esJefeFinalRun =

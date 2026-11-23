@@ -107,12 +107,36 @@ export const PERSONAJES_INFO: Record<PersonajeId, IPersonajeInfo> = {
     }
 };
 
+export interface ICartaDescartadaVisual {
+    indiceMano: number;
+    cartaId: string;
+}
+
 export type EventoVisualCombate =
     | {
           tipo: "CARTA_JUGADA";
           jugadorId: string;
           cartaId: string;
           objetivoId?: string;
+          indiceMano?: number;
+          destinoCarta?: "DESCARTE" | "AGOTADAS" | "PODER";
+      }
+    | {
+          tipo: "CARTAS_DESCARTADAS";
+          jugadorId: string;
+          cartas: ICartaDescartadaVisual[];
+          destino: "DESCARTE" | "AGOTADAS";
+      }
+    | {
+          tipo: "MAZO_MEZCLADO";
+          jugadorId: string;
+          cantidadCartas: number;
+      }
+    | {
+          tipo: "CARTAS_ROBADAS";
+          jugadorId: string;
+          cantidad: number;
+          cartasIds: string[];
       }
     | {
           tipo: "ATAQUE_EJECUTADO";

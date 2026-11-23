@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite, Color } from "cc";
+import { _decorator, Component, Label, EventTouch, Vec3, Node, Sprite, Color, UIOpacity } from "cc";
 import { ICartaData } from "../../compartido/Cartas";
 import {
     CATALOGO_ENCANTAMIENTOS,
@@ -28,20 +28,29 @@ export class CardView extends Component {
     private posOriginal: Vec3 = new Vec3();
     private arrastrando: boolean = false;
     private arrastreHabilitado: boolean = true;
+    private ocultoPorVfx: boolean = false;
+    private uiOpacity: UIOpacity | null = null;
 
     private estadosLanzadorActual: IMapaEstadosLectura | undefined = undefined;
     private contextoExtraActual: IContextoCalculoCarta | undefined = undefined;
     private ultimoObjetivoHoverId: string | undefined = undefined;
 
-    private onSolicitarJugar: ((indiceMano: number, objetivoId?: string) => void) | null = null;
-    private buscarObjetivoEnPunto: ((tipo: "ENEMIGO" | "ALIADO", touchPosWorld: Vec3) => string | undefined) | null = null;
-    private obtenerEstadosObjetivo: ((objetivoId: string) => IMapaEstadosLectura | undefined) | null = null;
+    private onSolicitarJugar:
+        | ((indiceMano: number, objetivoId?: string, posOrigenMundo?: Vec3) => void)
+        | null = null;
+    private buscarObjetivoEnPunto:
+        | ((tipo: "ENEMIGO" | "ALIADO", touchPosWorld: Vec3) => string | undefined)
+        | null = null;
+    private obtenerEstadosObjetivo:
+        | ((objetivoId: string) => IMapaEstadosLectura | undefined)
+        | null = null;
 
     public get estaArrastrando(): boolean {
         return this.arrastrando;
     }
 
     onLoad() {
+        this.uiOpacity = this.node.getComponent(UIOpacity) || this.node.addComponent(UIOpacity);
         this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
         this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
         this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
@@ -53,11 +62,28 @@ export class CardView extends Component {
         this.ultimoObjetivoHoverId = undefined;
     }
 
+    /**
+     * Oculta visualmente la carta y bloquea el arrastre mientras su clon VFX vuela desde Robo,
+     * manteniendo el nodo activo para que el Layout de ContenedorMano reserve su posición exacta.
+     */
+    public setOcultoPorVfx(oculto: boolean): void {
+        this.ocultoPorVfx = oculto;
+        if (!this.uiOpacity) {
+            this.uiOpacity = this.node.getComponent(UIOpacity) || this.node.addComponent(UIOpacity);
+        }
+        this.uiOpacity.opacity = oculto ? 0 : 255;
+
+        if (oculto) {
+            this.arrastrando = false;
+            this.ultimoObjetivoHoverId = undefined;
+        }
+    }
+
     public configurar(
         indice: number,
         data: ICartaData,
         puedePagarse: boolean,
-        onJugar: (indiceMano: number, objetivoId?: string) => void,
+        onJugar: (indiceMano: number, objetivoId?: string, posOrigenMundo?: Vec3) => void,
         buscarObjetivo: (tipo: "ENEMIGO" | "ALIADO", pos: Vec3) => string | undefined,
         estadosLanzador?: IMapaEstadosLectura,
         obtenerEstadosObjetivo?: (objetivoId: string) => IMapaEstadosLectura | undefined,
@@ -134,6 +160,7 @@ export class CardView extends Component {
     ) {
         this.arrastrando = false;
         this.ultimoObjetivoHoverId = undefined;
+        this.setOcultoPorVfx(false);
         this.configurar(
             -1,
             data,
@@ -199,7 +226,7 @@ export class CardView extends Component {
     }
 
     private onTouchStart() {
-        if (!this.arrastreHabilitado) return;
+        if (!this.arrastreHabilitado || this.ocultoPorVfx) return;
         this.arrastrando = true;
         this.ultimoObjetivoHoverId = undefined;
         this.posOriginal.set(this.node.position);
@@ -233,13 +260,14 @@ export class CardView extends Component {
         this.ultimoObjetivoHoverId = undefined;
         this.refrescarTextoDinamico(undefined);
 
+        const posSoltadoMundo = this.node.worldPosition.clone();
         const desplazamientoY = this.node.position.y - this.posOriginal.y;
         this.node.setPosition(this.posOriginal);
 
         if (desplazamientoY < 90) return;
 
         if (!this.cartaData.objetivoSeleccion) {
-            this.onSolicitarJugar?.(this.indiceMano, undefined);
+            this.onSolicitarJugar?.(this.indiceMano, undefined, posSoltadoMundo);
         } else {
             const uiPos = event.getUILocation();
             const objetivoId = this.buscarObjetivoEnPunto?.(
@@ -247,7 +275,7 @@ export class CardView extends Component {
                 new Vec3(uiPos.x, uiPos.y, 0)
             );
             if (objetivoId) {
-                this.onSolicitarJugar?.(this.indiceMano, objetivoId);
+                this.onSolicitarJugar?.(this.indiceMano, objetivoId, posSoltadoMundo);
             }
         }
     }

@@ -1,0 +1,134 @@
+{
+  "ver": "1.0.27",
+  "importer": "image",
+  "imported": true,
+  "uuid": "ad6b5022-57cd-493d-92d7-14c85d0953cc",
+  "files": [
+    ".json",
+    ".png"
+  ],
+  "subMetas": {
+    "6c48a": {
+      "importer": "texture",
+      "uuid": "ad6b5022-57cd-493d-92d7-14c85d0953cc@6c48a",
+      "displayName": "carta_dorso",
+      "id": "6c48a",
+      "name": "texture",
+      "userData": {
+        "wrapModeS": "clamp-to-edge",
+        "wrapModeT": "clamp-to-edge",
+        "imageUuidOrDatabaseUri": "ad6b5022-57cd-493d-92d7-14c85d0953cc",
+        "isUuid": true,
+        "visible": false,
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "ad6b5022-57cd-493d-92d7-14c85d0953cc@f9941",
+      "displayName": "carta_dorso",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": -7.5,
+        "offsetY": 0,
+        "trimX": 20,
+        "trimY": 44,
+        "width": 269,
+        "height": 405,
+        "rawWidth": 324,
+        "rawHeight": 493,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "vertices": {
+          "rawPosition": [
+            -134.5,
+            -202.5,
+            0,
+            134.5,
+            -202.5,
+            0,
+            -134.5,
+            202.5,
+            0,
+            134.5,
+            202.5,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            20,
+            449,
+            289,
+            449,
+            20,
+            44,
+            289,
+            44
+          ],
+          "nuv": [
+            0.06172839506172839,
+            0.08924949290060852,
+            0.8919753086419753,
+            0.08924949290060852,
+            0.06172839506172839,
+            0.9107505070993914,
+            0.8919753086419753,
+            0.9107505070993914
+          ],
+          "minPos": [
+            -134.5,
+            -202.5,
+            0
+          ],
+          "maxPos": [
+            134.5,
+            202.5,
+            0
+          ]
+        },
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "ad6b5022-57cd-493d-92d7-14c85d0953cc@6c48a",
+        "atlasUuid": ""
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "type": "sprite-frame",
+    "hasAlpha": true,
+    "fixAlphaTransparencyArtifacts": false,
+    "redirect": "ad6b5022-57cd-493d-92d7-14c85d0953cc@6c48a"
+  }
+}

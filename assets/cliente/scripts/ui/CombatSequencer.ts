@@ -9,7 +9,8 @@ export class CombatSequencer {
 
     constructor(
         private buscarVistaEntidad: (id: string) => CombatEntityView | undefined,
-        private alTerminarColaCallback: () => void
+        private alTerminarColaCallback: () => void,
+        private onEventoVfxCarta?: (ev: EventoVisualCombate) => number | void
     ) {}
 
     public get estaReproduciendo(): boolean {
@@ -44,8 +45,35 @@ export class CombatSequencer {
     private async ejecutarEvento(ev: EventoVisualCombate): Promise<void> {
         switch (ev.tipo) {
             case "CARTA_JUGADA":
+                this.onEventoVfxCarta?.(ev);
                 await this.esperar(60);
                 break;
+
+            case "CARTAS_DESCARTADAS":
+                this.onEventoVfxCarta?.(ev);
+                await this.esperar(90);
+                break;
+
+            case "MAZO_MEZCLADO": {
+                // Espera a que terminen de volar los dorsos hacia el mazo de robo antes de robar
+                const esperaMs = this.onEventoVfxCarta?.(ev) || 0;
+                if (esperaMs > 0) {
+                    await this.esperar(esperaMs);
+                }
+                break;
+            }
+
+            case "CARTAS_ROBADAS": {
+                const esperaMs = this.onEventoVfxCarta?.(ev) || 0;
+                const siguienteEsMezcla = this.cola[0]?.tipo === "MAZO_MEZCLADO";
+                if (siguienteEsMezcla) {
+                    // Breve pausa para que salgan las últimas cartas antes de mezclar el descarte
+                    await this.esperar(Math.max(180, esperaMs));
+                } else if (esperaMs > 0) {
+                    await this.esperar(esperaMs);
+                }
+                break;
+            }
 
             case "ATAQUE_EJECUTADO": {
                 const atacante = this.buscarVistaEntidad(ev.atacanteId);

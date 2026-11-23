@@ -23,7 +23,10 @@ import {
     resolverIntencionPatron,
     sortearRangoEntero
 } from "../../../assets/cliente/compartido/Enemigos";
-import { EventoVisualCombate } from "../../../assets/cliente/compartido/GameTypes";
+import {
+    EventoVisualCombate,
+    ICartaDescartadaVisual
+} from "../../../assets/cliente/compartido/GameTypes";
 import { ActionQueue } from "./ActionQueue";
 import { CombatEventBus, EntidadCombate } from "./CombatEventBus";
 import {
@@ -133,7 +136,6 @@ export class CombatEngine {
         return copia;
     }
 
-    /** Crea un EnemyState con vida sorteada, escalada al mapa actual y multiplicada por jugadores */
     public static crearInstanciaEnemigo(
         enemigoId: string,
         state: SpireState,
@@ -619,16 +621,31 @@ export class CombatEngine {
                 }
                 case "AGOTAR_CARTA_MANO_AZAR": {
                     cola.encolarAlFinal({
-                        ejecutar: () => {
+                        ejecutar: (_st, q) => {
                             const manoTemp = [...lanzador.mano];
+                            const indicesOriginales = manoTemp.map((_, idx) => idx);
+                            const cartasAgotadas: ICartaDescartadaVisual[] = [];
+
                             for (let i = 0; i < efecto.cantidad; i++) {
                                 if (manoTemp.length === 0) break;
                                 const idxAzar = Math.floor(Math.random() * manoTemp.length);
                                 const agotada = manoTemp.splice(idxAzar, 1)[0];
+                                const idxOrig = indicesOriginales.splice(idxAzar, 1)[0];
                                 if (agotada) {
                                     lanzador.agotadasInterno.push(limpiarMarcadoresTemporalesCarta(agotada));
+                                    cartasAgotadas.push({ indiceMano: idxOrig, cartaId: agotada });
                                 }
                             }
+
+                            if (cartasAgotadas.length > 0) {
+                                q.emitirVisual({
+                                    tipo: "CARTAS_DESCARTADAS",
+                                    jugadorId: lanzador.sessionId,
+                                    cartas: cartasAgotadas,
+                                    destino: "AGOTADAS"
+                                });
+                            }
+
                             this.sincronizarArraySchema(lanzador.mano, manoTemp);
                             this.actualizarContadoresMazo(lanzador);
                         }
@@ -728,11 +745,20 @@ export class CombatEngine {
             jugador.ataquesJugadosTurno += 1;
         }
 
+        const destinoCarta: "DESCARTE" | "AGOTADAS" | "PODER" =
+            cartaData.tipo === "PODER"
+                ? "PODER"
+                : cartaData.agotar || cartaData.eterea
+                ? "AGOTADAS"
+                : "DESCARTE";
+
         this.colaActiva.emitirVisual({
             tipo: "CARTA_JUGADA",
             jugadorId: jugador.sessionId,
-            cartaId: cartaData.id,
-            objetivoId
+            cartaId,
+            objetivoId,
+            indiceMano,
+            destinoCarta
         });
 
         this.encolarEfectos(
@@ -754,9 +780,9 @@ export class CombatEngine {
         });
 
         const cartaLimpia = limpiarMarcadoresTemporalesCarta(cartaId);
-        if (cartaData.tipo === "PODER") {
+        if (destinoCarta === "PODER") {
             // Los poderes se consumen al jugarse
-        } else if (cartaData.agotar || cartaData.eterea) {
+        } else if (destinoCarta === "AGOTADAS") {
             jugador.agotadasInterno.push(cartaLimpia);
         } else {
             jugador.descarteInterno.push(cartaLimpia);
@@ -802,7 +828,7 @@ export class CombatEngine {
             (arr) => this.mezclarArray(arr),
             (j) => this.actualizarContadoresMazo(j)
         );
-        accion.ejecutar();
+        accion.ejecutar(undefined, this.colaActiva);
     }
 
     public static descartarMano(jugador: PlayerState, state?: SpireState): void {
@@ -857,18 +883,45 @@ export class CombatEngine {
 
         const cartasActuales = [...jugador.mano];
         const retenidasEnMano: string[] = [];
+        const cartasDescarte: ICartaDescartadaVisual[] = [];
+        const cartasAgotadas: ICartaDescartadaVisual[] = [];
 
-        for (const carta of cartasActuales) {
+        for (let i = 0; i < cartasActuales.length; i++) {
+            const carta = cartasActuales[i];
             if (!carta) continue;
             const data = obtenerDataCarta(carta);
             const cartaLimpia = limpiarMarcadoresTemporalesCarta(carta);
             if (data?.eterea) {
                 jugador.agotadasInterno.push(cartaLimpia);
+                cartasAgotadas.push({ indiceMano: i, cartaId: carta });
             } else if (data?.eterno) {
                 retenidasEnMano.push(cartaLimpia);
             } else {
                 jugador.descarteInterno.push(cartaLimpia);
+                cartasDescarte.push({ indiceMano: i, cartaId: carta });
             }
+        }
+
+        if (cartasDescarte.length > 0) {
+            this.colaActiva.emitirVisual({
+                tipo: "CARTAS_DESCARTADAS",
+                jugadorId: jugador.sessionId,
+                cartas: cartasDescarte,
+                destino: "DESCARTE"
+            });
+        }
+
+        if (cartasAgotadas.length > 0) {
+            this.colaActiva.emitirVisual({
+                tipo: "CARTAS_DESCARTADAS",
+                jugadorId: jugador.sessionId,
+                cartas: cartasAgotadas,
+                destino: "AGOTADAS"
+            });
+        }
+
+        if (state && (cartasDescarte.length > 0 || cartasAgotadas.length > 0)) {
+            this.procesarColaPendiente(state);
         }
 
         this.sincronizarArraySchema(jugador.mano, retenidasEnMano);
